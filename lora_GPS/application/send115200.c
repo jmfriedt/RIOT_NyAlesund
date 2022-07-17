@@ -12,12 +12,12 @@ int main(int argc,char **argv)
  struct timeval tv1,tv2;
  struct timezone tz;
  char t[N],r;
- int k;
+ unsigned int k;
 
  int fd,cnt=0;FILE *f;
  unsigned char cmd;
  fd=init_rs232(); 
- for (k=0;k<N;k++) t[k]=(char)((k+33)&0x7f);
+ for (k=0;k<N;k++) {t[k]=(((unsigned char)k&0x3f)+33);printf("%hhu ",t[k]);}
 
  while (1)
    {write(fd,t,N);

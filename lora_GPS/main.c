@@ -10,7 +10,6 @@
 
 #include "thread.h"
 #include "shell.h"
-#include "shell_commands.h"
 
 #include "net/netdev.h"
 #include "net/netdev/lora.h"
@@ -29,24 +28,24 @@
 #define SX127X_LORA_MSG_QUEUE   (16U)
 #define SX127X_STACKSIZE        (THREAD_STACKSIZE_DEFAULT*2) // 1024*2
 
-static char stack[SX127X_STACKSIZE];
-static mutex_t _mutex = MUTEX_INIT;
+static char stacktx[SX127X_STACKSIZE];
+static kernel_pid_t _rstx_pid;
+static mutex_t _mutexin = MUTEX_INIT;
 
-#define with_rs 1
-
-#ifdef with_rs
-static kernel_pid_t _rs_pid;
-#endif
+static char stackrx[SX127X_STACKSIZE];
+static kernel_pid_t _rsrx_pid;
+static mutex_t _mutexout = MUTEX_INIT;
 
 #define BUFSIZE (1024)
 
-static char messagein[SX127X_LORA_MSG_QUEUE*2];
+static char messagein[BUFSIZE];
 static char messageout[BUFSIZE];
 static sx127x_t sx127x;
 
 #include "periph/timer.h"
 #include "xtimer.h"
 volatile unsigned int compteurin;
+volatile unsigned int indexin;
 
 #include "stdio_uart.h"
 
@@ -171,8 +170,10 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
 
         case NETDEV_EVENT_RX_COMPLETE:
             len = dev->driver->recv(dev, NULL, 0, 0);
-            dev->driver->recv(dev, messagein, len, &packet_info);
-if (len<SX127X_LORA_MSG_QUEUE) {messagein[len]=0; printf("%d\n",(int)len);}
+//            mutex_lock(&_mutexout);
+            dev->driver->recv(dev, &messagein[indexin], len, &packet_info);
+            indexin+=len;
+            if (len<SX127X_LORA_MSG_QUEUE) {/*messagein[len]=0;*/ printf("%d\n",(int)len);}
             else {printf("%d ",(int)len);}
 // DO NOT display the payload as it will generate ISR stack overflow due to
 //   excessive communication on UART
@@ -181,7 +182,6 @@ if (len<SX127X_LORA_MSG_QUEUE) {messagein[len]=0; printf("%d\n",(int)len);}
                 packet_info.rssi, (int)packet_info.snr,
                 sx127x_get_time_on_air((const sx127x_t *)dev, len));
 */
-// stdio_write(messagein, (int)len);
             break;
 
         case NETDEV_EVENT_TX_COMPLETE:
@@ -203,26 +203,53 @@ if (len<SX127X_LORA_MSG_QUEUE) {messagein[len]=0; printf("%d\n",(int)len);}
     }
 }
 
-#ifdef with_rs
-void *_rs_thread(void *arg)
+void *_rstx_thread(void *arg)
 {
     (void)arg;
     char val;
     static msg_t _msg_q[SX127X_LORA_MSG_QUEUE];
     msg_init_queue(_msg_q, SX127X_LORA_MSG_QUEUE);
-    puts("RS thread");fflush(stdout);
+    puts("TX thread");fflush(stdout);
 
     while (1) 
        {stdio_read (&val,1);  // requires USEMODULE += shell in Makefile
-        mutex_lock(&_mutex);
+        mutex_lock(&_mutexin);
         if (compteurin<BUFSIZE)
           {messageout[compteurin]=val;
+// printf("%d: %d\n",compteurin,val); // MUST be remove for maximum bandwidth
            compteurin++;
-           mutex_unlock(&_mutex);
+           mutex_unlock(&_mutexin);
           } 
        }
 }
-#endif
+
+void *_rsrx_thread(void *arg)
+{
+    (void)arg;
+    static msg_t _msg_q[SX127X_LORA_MSG_QUEUE];
+    msg_init_queue(_msg_q, SX127X_LORA_MSG_QUEUE);
+    xtimer_ticks32_t last_wakeup;
+    uint32_t interval = 25600;
+    unsigned int oldindexin=0;
+
+    puts("RX thread");fflush(stdout);
+    while (1) 
+       {
+        last_wakeup = xtimer_now();
+        xtimer_periodic_wakeup(&last_wakeup, interval);
+        mutex_lock(&_mutexout);
+        if (indexin>0)
+          {if (oldindexin==indexin)
+              {printf("\n%d:\n",indexin); 
+               stdio_write (messagein,indexin);  // requires USEMODULE += shell in Makefile
+               printf("\n"); 
+               indexin=0; // content of buffer has been dumped, restart
+              }
+           else {oldindexin=indexin;}
+          }
+        mutex_unlock(&_mutexout);
+       }
+}
 
 gpio_t jmf_gpio_in=GPIO_PIN(0,15); // PA15 = P4
 
@@ -255,17 +282,15 @@ int main(void)
     if (gpio_read(jmf_gpio_in))
        {puts("\nTX\n");
         printf("THREAD_STACKSIZE_DEFAULT: %d\n",THREAD_STACKSIZE_DEFAULT);
-#ifdef with_rs
-        _rs_pid =   thread_create(stack, sizeof(stack), THREAD_PRIORITY_MAIN - 1,
-                              THREAD_CREATE_STACKTEST, _rs_thread, NULL,
-                             "rs_thread");
-#endif
+        _rstx_pid =   thread_create(stacktx, sizeof(stacktx), THREAD_PRIORITY_MAIN - 1,
+                              THREAD_CREATE_STACKTEST, _rstx_thread, NULL,
+                             "rstx_thread");
         oldcompteurin=0;
         while (1)
           { last_wakeup = xtimer_now();
             xtimer_periodic_wakeup(&last_wakeup, interval);
 //            puts("T");
-            mutex_lock(&_mutex);
+            mutex_lock(&_mutexin);
             if (compteurin>0)                               // RS232 received
               {
                if (compteurin==oldcompteurin)              // but long silence since
@@ -293,10 +318,15 @@ int main(void)
                else
                  {oldcompteurin=compteurin;}
               }
-            mutex_unlock(&_mutex);
+            mutex_unlock(&_mutexin);
           }
        }
     else
-       {puts("\nRX\n"); listen_cmd();}
+       {
+        _rsrx_pid =   thread_create(stackrx, sizeof(stackrx), THREAD_PRIORITY_MAIN - 1,
+                              THREAD_CREATE_STACKTEST, _rsrx_thread, NULL,
+                             "rsrx_thread");
+        indexin=0;
+        puts("\nRX\n"); listen_cmd();}
     return 0;
 }
