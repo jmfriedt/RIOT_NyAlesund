@@ -174,6 +174,8 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
             dev->driver->recv(dev, messagein, len, &packet_info);
 if (len<SX127X_LORA_MSG_QUEUE) {messagein[len]=0; printf("%d\n",(int)len);}
             else {printf("%d ",(int)len);}
+// DO NOT display the payload as it will generate ISR stack overflow due to
+//   excessive communication on UART
 /*                "{Payload: \"%s\" (%d bytes), RSSI: %i, SNR: %i, TOA: %" PRIu32 "}\n",
                 messagein, (int)len,
                 packet_info.rssi, (int)packet_info.snr,
