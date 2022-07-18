@@ -23,7 +23,7 @@ gdb-multiarch  bin/im880b/lora_GPS.elf
   target extended-remote localhost:3333
 ```
 
-<a img src="pinout.png">
+<img src="pinout.png">
 
-<a img src="setup.jpg">
+<img src="setup.jpg">
 
