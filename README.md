@@ -1,8 +1,29 @@
-# RIOT_tests
-RIOT OS communictation tests involving timers and RS232 aimed at trasfering sentences from a U-Blox GPS receiver over sub-GHz LoRa link provided by the SX1272 of an im880b board.
+## Compiling
 
-## Compiling and executing
+```
+CFLAGS="-DISR_STACK_SIZE=2048 -DSTDIO_UART_BAUDRATE=115200 -DSERIAL_BAUDRATE=115200" DRIVER=sx1272 BOARD=im880b make
+```
 
-Store the repository in the ``tests/`` subdirectory of RIOT-OS. The ``readme.jmf`` text file holds the commands for compiling and transfering the program either through RS232 link (using ``stm32flash`` with GNU/Linux) or ST-Link/v2 with ``openocd``.
+## Flashing through serial port
 
-The ``application`` subdirectory provides a test-program to be executed on a PC connected to an im880b through RS232 for sending known data and assessing communication bandwidth or data loss.
+```
+stm32flash -w bin/im880b/lora_GPS.bin /dev/ttyUSB0
+stm32flash -w bin/im880b/lora_GPS.bin /dev/ttyUSB1
+```
+
+## Flashing through STLink/v2
+
+```
+openocd -f interface/stlink-v2.cfg -f target/stm32l1.cfg
+```
+and
+
+```
+gdb-multiarch  bin/im880b/lora_GPS.elf
+  target extended-remote localhost:3333
+```
+
+<a img src="pinout.png">
+
+<a img src="setup.jpg">
+
