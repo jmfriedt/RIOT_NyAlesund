@@ -30,7 +30,7 @@
 #ifdef RXROVER
 #define SX127X_LORA_MSG_QUEUE   (16U) 
 #else // TXBASE
-#define SX127X_LORA_MSG_QUEUE   (32U) 
+#define SX127X_LORA_MSG_QUEUE   (64U) 
 #endif
 #define SX127X_STACKSIZE        (THREAD_STACKSIZE_DEFAULT*4) // 1024*2
 
@@ -242,7 +242,7 @@ void *_rsrx_thread(void *arg)
     static msg_t _msg_q[SX127X_LORA_MSG_QUEUE*2];
     msg_init_queue(_msg_q, SX127X_LORA_MSG_QUEUE*2);
     xtimer_ticks32_t last_wakeup;
-    uint32_t interval = 25600;
+    uint32_t interval = 25600*2;
     unsigned int oldindexin=0;
 
     puts("RX thread");fflush(stdout);
@@ -255,7 +255,8 @@ void *_rsrx_thread(void *arg)
              {
 //        mutex_lock(&_mutexout);
 //            printf("\n%d:",indexin);  // TOTAL PAYLOAD
-              stdio_write (message,indexin);  // requires USEMODULE += shell in Makefile
+if (indexin>1432) {indexin=1432;}
+               stdio_write (message,indexin);  // requires USEMODULE += shell in Makefile
                indexin=0; // content of buffer has been dumped, restart
 //        mutex_unlock(&_mutexout);
               }
