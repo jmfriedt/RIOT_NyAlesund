@@ -22,3 +22,18 @@ and
 gdb-multiarch  bin/im880b/lora_GPS.elf
   target extended-remote localhost:3333
 ```
+
+## Application
+
+RTK GPS using UBlox ZED-F9P, one acting as base station (static transmitter) and one acting as
+rover (mobile receiver). We have observed that for GPS and Galileo active, using only RAWX messages
+in UBX format at 115200 bauds, the payload is about 1200 bytes long or 12000 bits every second.
+That's about half the datarate of LoRa set to 500 kHz bandwidth, SF=7 and CR=5 according to
+https://www.rfwireless-world.com/calculators/LoRa-Data-Rate-Calculator.html (CR=1 on the website).
+We have observed that different settings must be used for transmitter and receiver, namely 
+32-byte transmission to avoid communication overhead latencies, and 16-byte reception to avoid
+ISR stack corruption. The output of the LoRa receiver (base station messages) on the rover and the 
+second UBlox receiver (rover) are fed to ``rtknavi_qt`` set to Kinematic mode, receiving UBX
+messages from ``/dev/ttyUSB0`` and ``/dev/ttyACM0``.
+
+<img src=

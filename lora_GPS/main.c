@@ -2,6 +2,8 @@
    must be DIFFERENT stack for each thread!
  */
 
+#define RXROVER
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,21 +27,27 @@
 
 #include "mutex.h"
 
-#define SX127X_LORA_MSG_QUEUE   (16U)
-#define SX127X_STACKSIZE        (THREAD_STACKSIZE_DEFAULT*2) // 1024*2
+#ifdef RXROVER
+#define SX127X_LORA_MSG_QUEUE   (16U) 
+#else // TXBASE
+#define SX127X_LORA_MSG_QUEUE   (32U) 
+#endif
+#define SX127X_STACKSIZE        (THREAD_STACKSIZE_DEFAULT*4) // 1024*2
 
-static char stacktx[SX127X_STACKSIZE];
-static kernel_pid_t _rstx_pid;
-static mutex_t _mutexin = MUTEX_INIT;
 
+#ifdef RXROVER
 static char stackrx[SX127X_STACKSIZE];
 static kernel_pid_t _rsrx_pid;
-static mutex_t _mutexout = MUTEX_INIT;
+//static mutex_t _mutexout = MUTEX_INIT;
+#else
+static char stacktx[SX127X_STACKSIZE];
+static kernel_pid_t _rstx_pid;
+//static mutex_t _mutexin = MUTEX_INIT;
+#endif
 
-#define BUFSIZE (1024)
+#define BUFSIZE (1024*3)
 
-static char messagein[BUFSIZE];
-static char messageout[BUFSIZE];
+static char message[BUFSIZE]; // both for input or output since only used in one direction
 static sx127x_t sx127x;
 
 #include "periph/timer.h"
@@ -171,10 +179,15 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
         case NETDEV_EVENT_RX_COMPLETE:
             len = dev->driver->recv(dev, NULL, 0, 0);
 //            mutex_lock(&_mutexout);
-            dev->driver->recv(dev, &messagein[indexin], len, &packet_info);
+            dev->driver->recv(dev, &message[indexin], len, &packet_info);
             indexin+=len;
-            if (len<SX127X_LORA_MSG_QUEUE) {/*messagein[len]=0;*/ printf("%d\n",(int)len);}
-            else {printf("%d ",(int)len);}
+//            mutex_unlock(&_mutexout);
+
+// INTERMEDIATE PAYLOAD
+//            if (len<SX127X_LORA_MSG_QUEUE) {/*messagein[len]=0;*/ printf("%d\n",(int)len);}
+//            else {printf("%d ",(int)len);} 
+// INTERMEDIATE PAYLOAD
+
 // DO NOT display the payload as it will generate ISR stack overflow due to
 //   excessive communication on UART
 /*                "{Payload: \"%s\" (%d bytes), RSSI: %i, SNR: %i, TOA: %" PRIu32 "}\n",
@@ -213,12 +226,12 @@ void *_rstx_thread(void *arg)
 
     while (1) 
        {stdio_read (&val,1);  // requires USEMODULE += shell in Makefile
-        mutex_lock(&_mutexin);
+//        mutex_lock(&_mutexin);
         if (compteurin<BUFSIZE)
-          {messageout[compteurin]=val;
+          {message[compteurin]=val;
 // printf("%d: %d\n",compteurin,val); // MUST be remove for maximum bandwidth
            compteurin++;
-           mutex_unlock(&_mutexin);
+//           mutex_unlock(&_mutexin);
           } 
        }
 }
@@ -226,8 +239,8 @@ void *_rstx_thread(void *arg)
 void *_rsrx_thread(void *arg)
 {
     (void)arg;
-    static msg_t _msg_q[SX127X_LORA_MSG_QUEUE];
-    msg_init_queue(_msg_q, SX127X_LORA_MSG_QUEUE);
+    static msg_t _msg_q[SX127X_LORA_MSG_QUEUE*2];
+    msg_init_queue(_msg_q, SX127X_LORA_MSG_QUEUE*2);
     xtimer_ticks32_t last_wakeup;
     uint32_t interval = 25600;
     unsigned int oldindexin=0;
@@ -237,17 +250,17 @@ void *_rsrx_thread(void *arg)
        {
         last_wakeup = xtimer_now();
         xtimer_periodic_wakeup(&last_wakeup, interval);
-        mutex_lock(&_mutexout);
         if (indexin>0)
           {if (oldindexin==indexin)
-              {printf("\n%d:\n",indexin); 
-               stdio_write (messagein,indexin);  // requires USEMODULE += shell in Makefile
-               printf("\n"); 
+             {
+//        mutex_lock(&_mutexout);
+//            printf("\n%d:",indexin);  // TOTAL PAYLOAD
+              stdio_write (message,indexin);  // requires USEMODULE += shell in Makefile
                indexin=0; // content of buffer has been dumped, restart
+//        mutex_unlock(&_mutexout);
               }
-           else {oldindexin=indexin;}
+           else {oldindexin=indexin;} // still receiving
           }
-        mutex_unlock(&_mutexout);
        }
 }
 
@@ -257,12 +270,14 @@ gpio_t jmf_gpio_in=GPIO_PIN(0,15); // PA15 = P4
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
 int main(void)
-{
+{   
+#ifndef RXROVER
     int res;
     unsigned int oldcompteurin;
     uint32_t interval = 25600;
     int indice=0;
     xtimer_ticks32_t last_wakeup;
+#endif
     gpio_init(jmf_gpio_in, GPIO_IN_PU);
     msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
 
@@ -276,11 +291,12 @@ int main(void)
     netdev->event_callback = _event_cb;
 
 //reset_cmd();
-    lora_setup_cmd(500,7,5);
+    lora_setup_cmd(500,7,5); // 500 kHz, SF=7 => 21875 bps
     channel_cmd(868000000);
 
-    if (gpio_read(jmf_gpio_in))
-       {puts("\nTX\n");
+//    if (gpio_read(jmf_gpio_in))
+#ifndef RXROVER
+       {
         printf("THREAD_STACKSIZE_DEFAULT: %d\n",THREAD_STACKSIZE_DEFAULT);
         _rstx_pid =   thread_create(stacktx, sizeof(stacktx), THREAD_PRIORITY_MAIN - 1,
                               THREAD_CREATE_STACKTEST, _rstx_thread, NULL,
@@ -290,27 +306,28 @@ int main(void)
           { last_wakeup = xtimer_now();
             xtimer_periodic_wakeup(&last_wakeup, interval);
 //            puts("T");
-            mutex_lock(&_mutexin);
+//            mutex_lock(&_mutexin);
             if (compteurin>0)                               // RS232 received
               {
                if (compteurin==oldcompteurin)              // but long silence since
                  {
                   indice=0;
+                  printf("TX %d\n",compteurin);
                   do{
                      if (compteurin>=SX127X_LORA_MSG_QUEUE)
                        {//puts(":");
-                        do {res=send_cmd(&messageout[indice],SX127X_LORA_MSG_QUEUE);
+                        do {res=send_cmd(&message[indice],SX127X_LORA_MSG_QUEUE);
                            } while (res!=0);
                         indice+=SX127X_LORA_MSG_QUEUE;
                         compteurin-=SX127X_LORA_MSG_QUEUE;
-                        // last_wakeup = xtimer_now();
-                        // xtimer_periodic_wakeup(&last_wakeup, 300000);
+                        last_wakeup = xtimer_now();
+                        xtimer_periodic_wakeup(&last_wakeup, 30);
                        }
                      else
                       {//puts(".");
-                       do {res=send_cmd(&messageout[indice],compteurin);
+                       do {res=send_cmd(&message[indice],compteurin);
                           } while (res!=0);
-                       compteurin=0;oldcompteurin=0;
+                       compteurin=0; oldcompteurin=0;
                       }
                     if (res == -ENOTSUP) { puts("*");}
                    } while (compteurin>0);
@@ -318,15 +335,19 @@ int main(void)
                else
                  {oldcompteurin=compteurin;}
               }
-            mutex_unlock(&_mutexin);
+//            mutex_unlock(&_mutexin);
           }
        }
-    else
+#endif
+//    else // GPIO
+#ifdef RXROVER
        {
         _rsrx_pid =   thread_create(stackrx, sizeof(stackrx), THREAD_PRIORITY_MAIN - 1,
                               THREAD_CREATE_STACKTEST, _rsrx_thread, NULL,
                              "rsrx_thread");
         indexin=0;
-        puts("\nRX\n"); listen_cmd();}
+        puts("\nRX\n"); listen_cmd();
+       }
+#endif
     return 0;
 }
