@@ -36,4 +36,12 @@ ISR stack corruption. The output of the LoRa receiver (base station messages) on
 second UBlox receiver (rover) are fed to ``rtknavi_qt`` set to Kinematic mode, receiving UBX
 messages from ``/dev/ttyUSB0`` and ``/dev/ttyACM0``.
 
+Centimetric fix measurement (green) following the float solution (blue):
+
 <img src="rtknavi_qt.png">
+
+Evolution of the relative position:
+
+<img src="rtknavi_qt_rel0.png">
+<img src="rtknavi_qt_rel1.png">
+<img src="rtknavi_qt_rel2.png">
