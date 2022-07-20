@@ -48,6 +48,5 @@ Evolution of the relative position:
 
 ... and after much longer still consistent measurements
 
-<img src="pictures_logs/rtknavi_qt_rel3.png">
 <img src="pictures_logs/rtknavi_qt_rel4.png">
 <img src="pictures_logs/rtknavi_qt_rel5.png">
