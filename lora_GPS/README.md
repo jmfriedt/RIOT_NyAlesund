@@ -25,6 +25,8 @@ gdb-multiarch  bin/im880b/lora_GPS.elf
 
 ## Application
 
+<img src="setup.png">
+
 RTK GPS using UBlox ZED-F9P, one acting as base station (static transmitter) and one acting as
 rover (mobile receiver). We have observed that for GPS and Galileo active, using only RAWX messages
 in UBX format at 115200 bauds, the payload is about 1200 bytes long or 12000 bits every second.
