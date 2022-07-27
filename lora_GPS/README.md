@@ -1,3 +1,15 @@
+##
+
+See configuring_ublox.md for instructions on how to configure the UBlox Zed-F9P GNSS receiver
+to communicate UBX sentences with a small enough payload to be transmitted by the LoRa modems.
+
+<img src="circuits.png">
+
+The rover provides two USB outputs, one with the UBlox rover receiver output and the other
+with the messages transmitted from the base station over LoRa: each circuit (UBlox and im880b)
+is powered from its own USB cable. The base station is autonomous and is powered by a USB 
+Battery block through the UBlox GNSS receiver whose 3.3 V regulator powers the im880b circuit.
+
 ## Compiling
 
 ```
