@@ -50,12 +50,14 @@ static kernel_pid_t _rstx_pid;
 static char message[BUFSIZE]; // both for input or output since only used in one direction
 static sx127x_t sx127x;
 
+#include "stdio_uart.h"
+
 #include "periph/timer.h"
 #include "xtimer.h"
 volatile unsigned int compteurin;
 volatile unsigned int indexin;
 
-#include "stdio_uart.h"
+gpio_t jmf_gpio_out=GPIO_PIN(0,15); // PA15 = P4
 
 int lora_setup_cmd(int bw, uint8_t lora_sf, int cr)
 {
@@ -256,7 +258,9 @@ void *_rsrx_thread(void *arg)
 //        mutex_lock(&_mutexout);
 //            printf("\n%d:",indexin);  // TOTAL PAYLOAD
 if (indexin>1432) {indexin=1432;}
+               gpio_write(jmf_gpio_out,1);
                stdio_write (message,indexin);  // requires USEMODULE += shell in Makefile
+               gpio_write(jmf_gpio_out,0);
                indexin=0; // content of buffer has been dumped, restart
 //        mutex_unlock(&_mutexout);
               }
@@ -265,13 +269,12 @@ if (indexin>1432) {indexin=1432;}
        }
 }
 
-gpio_t jmf_gpio_in=GPIO_PIN(0,15); // PA15 = P4
-
 #define MAIN_QUEUE_SIZE     (8)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
 int main(void)
 {   
+    long int indicedump;
 #ifndef RXROVER
     int res;
     unsigned int oldcompteurin;
@@ -279,7 +282,8 @@ int main(void)
     int indice=0;
     xtimer_ticks32_t last_wakeup;
 #endif
-    gpio_init(jmf_gpio_in, GPIO_IN_PU);
+    gpio_init(jmf_gpio_out, GPIO_OUT);
+    gpio_write(jmf_gpio_out,0);
     msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
 
     sx127x.params = sx127x_params[0];
@@ -295,7 +299,8 @@ int main(void)
     lora_setup_cmd(500,7,5); // 500 kHz, SF=7 => 21875 bps
     channel_cmd(868000000);
 
-//    if (gpio_read(jmf_gpio_in))
+    for (indicedump=0x40023800;indicedump<0x40023BFF;indicedump+=4)
+       {printf("%lx: %lx\n",indicedump,*(long*)(indicedump));}
 #ifndef RXROVER
        {
         printf("THREAD_STACKSIZE_DEFAULT: %d\n",THREAD_STACKSIZE_DEFAULT);
@@ -314,6 +319,7 @@ int main(void)
                  {
                   indice=0;
                   printf("TX %d\n",compteurin);
+                  gpio_write(jmf_gpio_out,1);
                   do{
                      if (compteurin>=SX127X_LORA_MSG_QUEUE)
                        {//puts(":");
@@ -332,6 +338,7 @@ int main(void)
                       }
                     if (res == -ENOTSUP) { puts("*");}
                    } while (compteurin>0);
+                  gpio_write(jmf_gpio_out,0);
                  }
                else
                  {oldcompteurin=compteurin;}
