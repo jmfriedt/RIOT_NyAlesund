@@ -32,6 +32,7 @@ and
 
 ```
 gdb-multiarch  bin/im880b/lora_GPS.elf
+  monitor reset halt
   target extended-remote localhost:3333
 ```
 
