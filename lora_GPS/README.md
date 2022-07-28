@@ -10,6 +10,8 @@ with the messages transmitted from the base station over LoRa: each circuit (UBl
 is powered from its own USB cable. The base station is autonomous and is powered by a USB 
 Battery block through the UBlox GNSS receiver whose 3.3 V regulator powers the im880b circuit.
 
+See https://github.com/CampusIoT/orbimote/tree/master/field_test_device for a pinout of the motherboard.
+
 ## Compiling
 
 ```
