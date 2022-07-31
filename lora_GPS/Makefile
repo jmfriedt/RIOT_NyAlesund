@@ -4,7 +4,9 @@ BOARD ?= b-l072z-lrwan1
 
 include ../Makefile.tests_common
 
-FEATURES_REQUIRED = periph_timer_periodic
+FEATURES_REQUIRED += periph_timer_periodic
+FEATURES_REQUIRED += periph_wdt
+
 
 #TIMER_SPEED ?= 1000000
 
@@ -17,6 +19,7 @@ USEMODULE += ps
 USEMODULE += periph_gpio  # https://www.hackster.io/ichatz/control-external-led-using-riot-os-b626da
 USEMODULE += periph_gpio_irq
 USEMODULE += xtimer
+USEMODULE += event_thread
 
 DRIVER ?= sx1276
 
@@ -24,5 +27,3 @@ DRIVER ?= sx1276
 USEMODULE += $(DRIVER)
 
 include $(RIOTBASE)/Makefile.include
-
-

@@ -2,7 +2,9 @@
    must be DIFFERENT stack for each thread!
  */
 
-#define RXROVER
+//#define RXROVER    // STATION if commented
+#define with_event
+#define with_wdt     // we verify that no message TX => reset after 5 seconds
 
 #include <errno.h>
 #include <stdio.h>
@@ -26,6 +28,10 @@
 #include "fmt.h"
 
 #include "mutex.h"
+ 
+#ifdef with_wdt
+#include "periph/wdt.h"
+#endif
 
 #ifdef RXROVER
 #define SX127X_LORA_MSG_QUEUE   (16U) 
@@ -165,10 +171,27 @@ int reset_cmd(void)
     return 0;
 }
 
+#ifdef with_event
+#include "event/thread.h"
+netdev_t *eventdev;
+
+static void _handler_high(event_t *event) {
+    (void)event;
+    eventdev->driver->isr(eventdev);
+}
+
+static event_t event_high = { .handler=_handler_high };
+#endif
+
 static void _event_cb(netdev_t *dev, netdev_event_t event)
 {
     if (event == NETDEV_EVENT_ISR) {
+#ifdef with_event
+        eventdev=dev;
+        event_post(EVENT_PRIO_HIGHEST, &event_high);
+#else
         dev->driver->isr(dev);
+#endif
     }
     else {
         size_t len;
@@ -259,6 +282,9 @@ void *_rsrx_thread(void *arg)
 //            printf("\n%d:",indexin);  // TOTAL PAYLOAD
 if (indexin>1432) {indexin=1432;}
                gpio_write(jmf_gpio_out,1);
+#ifdef with_wdt
+               wdt_kick();
+#endif
                stdio_write (message,indexin);  // requires USEMODULE += shell in Makefile
                gpio_write(jmf_gpio_out,0);
                indexin=0; // content of buffer has been dumped, restart
@@ -274,13 +300,14 @@ static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
 int main(void)
 {   
-    long int indicedump;
 #ifndef RXROVER
     int res;
     unsigned int oldcompteurin;
     uint32_t interval = 25600;
     int indice=0;
     xtimer_ticks32_t last_wakeup;
+#else
+    long int indicedump;
 #endif
     gpio_init(jmf_gpio_out, GPIO_OUT);
     gpio_write(jmf_gpio_out,0);
@@ -299,8 +326,14 @@ int main(void)
     lora_setup_cmd(500,7,5); // 500 kHz, SF=7 => 21875 bps
     channel_cmd(868000000);
 
+#ifdef RXROVER
     for (indicedump=0x40023800;indicedump<0x40023BFF;indicedump+=4)
        {printf("%lx: %lx\n",indicedump,*(long*)(indicedump));}
+#endif            // dont print when wathdog is triggered on TX
+#ifdef with_wdt
+    wdt_setup_reboot(0, 5000); // MAX_TIME in ms
+    wdt_start();
+#endif
 #ifndef RXROVER
        {
         printf("THREAD_STACKSIZE_DEFAULT: %d\n",THREAD_STACKSIZE_DEFAULT);
@@ -320,6 +353,9 @@ int main(void)
                   indice=0;
                   printf("TX %d\n",compteurin);
                   gpio_write(jmf_gpio_out,1);
+#ifdef with_wdt
+                  wdt_kick();
+#endif
                   do{
                      if (compteurin>=SX127X_LORA_MSG_QUEUE)
                        {//puts(":");
