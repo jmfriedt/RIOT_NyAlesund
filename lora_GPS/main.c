@@ -5,6 +5,7 @@
 //#define RXROVER    // STATION if commented
 #define with_event
 #define with_wdt     // we verify that no message TX => reset after 5 seconds
+volatile int validate_bandwidth=0; // tests for range vs SF, CR, bandwidth ...
 
 #include <errno.h>
 #include <stdio.h>
@@ -63,7 +64,8 @@ static sx127x_t sx127x;
 volatile unsigned int compteurin;
 volatile unsigned int indexin;
 
-gpio_t jmf_gpio_out=GPIO_PIN(0,15); // PA15 = P4
+gpio_t jmf_gpio_out=GPIO_PIN(0,15); // PA15 = P4 - JTDI
+gpio_t jmf_gpio_in= GPIO_PIN(0,12); // PA12 = P6 - USART1-RTS
 
 int lora_setup_cmd(int bw, uint8_t lora_sf, int cr)
 {
@@ -214,12 +216,15 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
 // INTERMEDIATE PAYLOAD
 
 // DO NOT display the payload as it will generate ISR stack overflow due to
-//   excessive communication on UART
-/*                "{Payload: \"%s\" (%d bytes), RSSI: %i, SNR: %i, TOA: %" PRIu32 "}\n",
-                messagein, (int)len,
-                packet_info.rssi, (int)packet_info.snr,
-                sx127x_get_time_on_air((const sx127x_t *)dev, len));
-*/
+//   excessive communication on UART 
+if (validate_bandwidth!=0)
+   {            printf(
+//Payload: \"%s\"*/ 
+                  "%d B, RSSI %i, SNR: %i, TOA: %u\n", 
+// messagein, 
+                (int)len, packet_info.rssi, (int)packet_info.snr,
+                (unsigned int)sx127x_get_time_on_air((const sx127x_t *)dev, len));
+   }
             break;
 
         case NETDEV_EVENT_TX_COMPLETE:
@@ -278,14 +283,16 @@ void *_rsrx_thread(void *arg)
         if (indexin>0)
           {if (oldindexin==indexin)
              {
-//        mutex_lock(&_mutexout);
+//            mutex_lock(&_mutexout);
 //            printf("\n%d:",indexin);  // TOTAL PAYLOAD
-if (indexin>1432) {indexin=1432;}
+               if (indexin>BUFSIZE) {indexin=BUFSIZE;} // received too many items
                gpio_write(jmf_gpio_out,1);
 #ifdef with_wdt
                wdt_kick();
 #endif
-               stdio_write (message,indexin);  // requires USEMODULE += shell in Makefile
+if (validate_bandwidth==0) 
+              {stdio_write (message,indexin);  // requires USEMODULE += shell in Makefile
+              }
                gpio_write(jmf_gpio_out,0);
                indexin=0; // content of buffer has been dumped, restart
 //        mutex_unlock(&_mutexout);
@@ -294,6 +301,9 @@ if (indexin>1432) {indexin=1432;}
           }
        }
 }
+
+// https://forum.riot-os.org/t/example-lorawan-on-bluepill-board/3183/28?page=2
+// #define SX127X_PARAM_PASELECT             (SX127X_PA_BOOST)
 
 #define MAIN_QUEUE_SIZE     (8)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
@@ -310,6 +320,8 @@ int main(void)
     long int indicedump;
 #endif
     gpio_init(jmf_gpio_out, GPIO_OUT);
+    gpio_init(jmf_gpio_in, GPIO_IN_PU);
+    validate_bandwidth=gpio_read(jmf_gpio_in);
     gpio_write(jmf_gpio_out,0);
     msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
 
@@ -323,9 +335,13 @@ int main(void)
     netdev->event_callback = _event_cb;
 
 //reset_cmd();
-    lora_setup_cmd(500,7,5); // 500 kHz, SF=7 => 21875 bps
-    channel_cmd(868000000);
+    //lora_setup_cmd(500,7,5); // 500 kHz, SF=7 => 21875 bps CR=1..4 overhead 1.25, 1.5, 1.75, 2
+    lora_setup_cmd(250,8,5);   // 250 kHz, SF=8 => 6.25 kbps CR=1..4 overhead 1.25, 1.5, 1.75, 2
+    channel_cmd(868000000);     // CR fixed at 4/5 (CR=1) for LoRaWAN
 
+//    sx127x_set_tx_power(&sx127x,20);                                                // 14
+    printf("PA: %d -- RFO is %d BOOST is %d\n",sx127x.params.paselect,SX127X_PA_RFO, SX127X_PA_BOOST); // 1 = PABOOST
+    printf("power: %d\n",sx127x_get_tx_power(&sx127x));                                                // 14
 #ifdef RXROVER
     for (indicedump=0x40023800;indicedump<0x40023BFF;indicedump+=4)
        {printf("%lx: %lx\n",indicedump,*(long*)(indicedump));}
@@ -353,6 +369,12 @@ int main(void)
                   indice=0;
                   printf("TX %d\n",compteurin);
                   gpio_write(jmf_gpio_out,1);
+/*
+                  if (validate_bandwidth!=0)
+                     { printf("PA: %d -- RFO is %d BOOST is %d\n",sx127x.params.paselect,SX127X_PA_RFO, SX127X_PA_BOOST); // 1 = PABOOST
+                       printf("power: %d\n",sx127x_get_tx_power(&sx127x));                                                // 14
+                     }
+*/
 #ifdef with_wdt
                   wdt_kick();
 #endif
