@@ -40,3 +40,13 @@ Galileo (E1) -- might not be necessary -- to reduce traffic, Send
 
 14. Disconnect, unplug USB, replug USB, reconnct and make sure the settings were saved (most
 significantly PRT - 115200 bauds)
+
+Since we have not managed to activate/deactivate GNSS constellation reception from U-Center, use ``gpsd``'s ``ubxtool`` to disable Galileo, GLONASS, Beidou, SBAS, and QZSS using 
+```bash
+ubxtool -d GLONASS
+ubxtool -d BEIDOU
+ubxtool -d QZSS
+ubxtool -d SBAS
+ubxtool -d GALILEO
+```
+While GPS remains active, we have not figured out how to disable L2C and keep only L1C/A, so we switch to a L1-only antenna on the station to reduce the amount of data transmitted.
