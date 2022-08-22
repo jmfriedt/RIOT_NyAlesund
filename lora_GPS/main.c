@@ -250,8 +250,6 @@ void *_rstx_thread(void *arg)
 {
     (void)arg;
     char val;
-    static msg_t _msg_q[SX127X_LORA_MSG_QUEUE];
-    msg_init_queue(_msg_q, SX127X_LORA_MSG_QUEUE);
     puts("TX thread");fflush(stdout);
 
     while (1) 
@@ -269,8 +267,6 @@ void *_rstx_thread(void *arg)
 void *_rsrx_thread(void *arg)
 {
     (void)arg;
-    static msg_t _msg_q[SX127X_LORA_MSG_QUEUE*2];
-    msg_init_queue(_msg_q, SX127X_LORA_MSG_QUEUE*2);
     xtimer_ticks32_t last_wakeup;
     uint32_t interval = 25600*2;
     unsigned int oldindexin=0;
@@ -336,7 +332,7 @@ int main(void)
 
 //reset_cmd();
     //lora_setup_cmd(500,7,5); // 500 kHz, SF=7 => 21875 bps CR=1..4 overhead 1.25, 1.5, 1.75, 2
-    lora_setup_cmd(250,8,5);   // 250 kHz, SF=8 => 6.25 kbps CR=1..4 overhead 1.25, 1.5, 1.75, 2
+    lora_setup_cmd(250,7,5);   // 250 kHz, SF=8 => 6.25 kbps CR=1..4 overhead 1.25, 1.5, 1.75, 2
     channel_cmd(868000000);     // CR fixed at 4/5 (CR=1) for LoRaWAN
 
 //    sx127x_set_tx_power(&sx127x,20);                                                // 14
