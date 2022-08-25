@@ -2,7 +2,7 @@
    must be DIFFERENT stack for each thread!
  */
 
-//#define RXROVER    // STATION if commented
+#define RXROVER    // STATION if commented
 #define with_event
 #define with_wdt     // we verify that no message TX => reset after 5 seconds
 volatile int validate_bandwidth=0; // tests for range vs SF, CR, bandwidth ...
@@ -304,6 +304,10 @@ if (validate_bandwidth==0)
 #define MAIN_QUEUE_SIZE     (8)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
+// for compatibility with Gateway
+#define CONFIG_LORA_PREAMBLE_LENGTH_DEFAULT         (8U)
+#define LORA_SYNCWORD_PUBLIC           (0x34)  /**< Syncword used for public networks */
+
 int main(void)
 {   
 #ifndef RXROVER
@@ -333,7 +337,10 @@ int main(void)
 //reset_cmd();
     //lora_setup_cmd(500,7,5); // 500 kHz, SF=7 => 21875 bps CR=1..4 overhead 1.25, 1.5, 1.75, 2
     lora_setup_cmd(250,7,5);   // 250 kHz, SF=8 => 6.25 kbps CR=1..4 overhead 1.25, 1.5, 1.75, 2
-    channel_cmd(868000000);     // CR fixed at 4/5 (CR=1) for LoRaWAN
+    channel_cmd(868300000);     // CR fixed at 4/5 (CR=1) for LoRaWAN
+//  868300000 for DR6 (SF7BW250), see https://lora-alliance.org/wp-content/uploads/2021/05/RP002-1.0.3-FINAL-1.pdf
+    netopt_enable_t iq_inverted = NETOPT_DISABLE;
+    netdev->driver->set(netdev, NETOPT_IQ_INVERT, &iq_inverted, sizeof(netopt_enable_t));
 
 //    sx127x_set_tx_power(&sx127x,20);                                                // 14
     printf("PA: %d -- RFO is %d BOOST is %d\n",sx127x.params.paselect,SX127X_PA_RFO, SX127X_PA_BOOST); // 1 = PABOOST
