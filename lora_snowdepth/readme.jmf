@@ -1,0 +1,7 @@
+CFLAGS="-DSTDIO_UART_BAUDRATE=9600 -DSTDIO_UART_DEV=1" BOARD=lora-e5-dev make 
+st-flash write bin/lora-e5-dev/field-test-device.bin 0x8000000
+
+https://maxbotix.com/products/mb7368
+
+echo "UjE4NzBSMTg3MFIxODc=" | base64 -d
+
