@@ -25,6 +25,8 @@ CFLAGS="-DISR_STACK_SIZE=2048 -DSTDIO_UART_BAUDRATE=115200 -DSERIAL_BAUDRATE=115
 
 To set the bootloader mode, connect pin 2 of X2 to Vcc (center of X9) and hit the blue reset button.
 
+<img src="ucenter/program.jpg">
+
 ```
 stm32flash -w bin/im880b/lora_GPS.bin /dev/ttyUSB0
 stm32flash -w bin/im880b/lora_GPS.bin /dev/ttyUSB1
