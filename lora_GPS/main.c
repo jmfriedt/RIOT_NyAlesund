@@ -2,10 +2,7 @@
    must be DIFFERENT stack for each thread!
  */
 
-#define RXROVER    // STATION if commented
-#define with_event
-#define with_wdt     // we verify that no message TX => reset after 5 seconds
-volatile int validate_bandwidth=0; // tests for range vs SF, CR, bandwidth ...
+#define RXROVER
 
 #include <errno.h>
 #include <stdio.h>
@@ -29,10 +26,6 @@ volatile int validate_bandwidth=0; // tests for range vs SF, CR, bandwidth ...
 #include "fmt.h"
 
 #include "mutex.h"
- 
-#ifdef with_wdt
-#include "periph/wdt.h"
-#endif
 
 #ifdef RXROVER
 #define SX127X_LORA_MSG_QUEUE   (16U) 
@@ -64,8 +57,7 @@ static sx127x_t sx127x;
 volatile unsigned int compteurin;
 volatile unsigned int indexin;
 
-gpio_t jmf_gpio_out=GPIO_PIN(0,15); // PA15 = P4 - JTDI
-gpio_t jmf_gpio_in= GPIO_PIN(0,12); // PA12 = P6 - USART1-RTS
+gpio_t jmf_gpio_out=GPIO_PIN(0,15); // PA15 = P4
 
 int lora_setup_cmd(int bw, uint8_t lora_sf, int cr)
 {
@@ -173,27 +165,10 @@ int reset_cmd(void)
     return 0;
 }
 
-#ifdef with_event
-#include "event/thread.h"
-netdev_t *eventdev;
-
-static void _handler_high(event_t *event) {
-    (void)event;
-    eventdev->driver->isr(eventdev);
-}
-
-static event_t event_high = { .handler=_handler_high };
-#endif
-
 static void _event_cb(netdev_t *dev, netdev_event_t event)
 {
     if (event == NETDEV_EVENT_ISR) {
-#ifdef with_event
-        eventdev=dev;
-        event_post(EVENT_PRIO_HIGHEST, &event_high);
-#else
         dev->driver->isr(dev);
-#endif
     }
     else {
         size_t len;
@@ -216,15 +191,12 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
 // INTERMEDIATE PAYLOAD
 
 // DO NOT display the payload as it will generate ISR stack overflow due to
-//   excessive communication on UART 
-if (validate_bandwidth!=0)
-   {            printf(
-//Payload: \"%s\"*/ 
-                  "%d B, RSSI %i, SNR: %i, TOA: %u\n", 
-// messagein, 
-                (int)len, packet_info.rssi, (int)packet_info.snr,
-                (unsigned int)sx127x_get_time_on_air((const sx127x_t *)dev, len));
-   }
+//   excessive communication on UART
+/*                "{Payload: \"%s\" (%d bytes), RSSI: %i, SNR: %i, TOA: %" PRIu32 "}\n",
+                messagein, (int)len,
+                packet_info.rssi, (int)packet_info.snr,
+                sx127x_get_time_on_air((const sx127x_t *)dev, len));
+*/
             break;
 
         case NETDEV_EVENT_TX_COMPLETE:
@@ -250,6 +222,8 @@ void *_rstx_thread(void *arg)
 {
     (void)arg;
     char val;
+    static msg_t _msg_q[SX127X_LORA_MSG_QUEUE];
+    msg_init_queue(_msg_q, SX127X_LORA_MSG_QUEUE);
     puts("TX thread");fflush(stdout);
 
     while (1) 
@@ -267,6 +241,8 @@ void *_rstx_thread(void *arg)
 void *_rsrx_thread(void *arg)
 {
     (void)arg;
+    static msg_t _msg_q[SX127X_LORA_MSG_QUEUE*2];
+    msg_init_queue(_msg_q, SX127X_LORA_MSG_QUEUE*2);
     xtimer_ticks32_t last_wakeup;
     uint32_t interval = 25600*2;
     unsigned int oldindexin=0;
@@ -279,16 +255,11 @@ void *_rsrx_thread(void *arg)
         if (indexin>0)
           {if (oldindexin==indexin)
              {
-//            mutex_lock(&_mutexout);
+//        mutex_lock(&_mutexout);
 //            printf("\n%d:",indexin);  // TOTAL PAYLOAD
-               if (indexin>BUFSIZE) {indexin=BUFSIZE;} // received too many items
+if (indexin>1432) {indexin=1432;}
                gpio_write(jmf_gpio_out,1);
-#ifdef with_wdt
-               wdt_kick();
-#endif
-if (validate_bandwidth==0) 
-              {stdio_write (message,indexin);  // requires USEMODULE += shell in Makefile
-              }
+               stdio_write (message,indexin);  // requires USEMODULE += shell in Makefile
                gpio_write(jmf_gpio_out,0);
                indexin=0; // content of buffer has been dumped, restart
 //        mutex_unlock(&_mutexout);
@@ -298,30 +269,20 @@ if (validate_bandwidth==0)
        }
 }
 
-// https://forum.riot-os.org/t/example-lorawan-on-bluepill-board/3183/28?page=2
-// #define SX127X_PARAM_PASELECT             (SX127X_PA_BOOST)
-
 #define MAIN_QUEUE_SIZE     (8)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
-// for compatibility with Gateway
-#define CONFIG_LORA_PREAMBLE_LENGTH_DEFAULT         (8U)
-#define LORA_SYNCWORD_PUBLIC           (0x34)  /**< Syncword used for public networks */
-
 int main(void)
 {   
+    long int indicedump;
 #ifndef RXROVER
     int res;
     unsigned int oldcompteurin;
     uint32_t interval = 25600;
     int indice=0;
     xtimer_ticks32_t last_wakeup;
-#else
-    long int indicedump;
 #endif
     gpio_init(jmf_gpio_out, GPIO_OUT);
-    gpio_init(jmf_gpio_in, GPIO_IN_PU);
-    validate_bandwidth=gpio_read(jmf_gpio_in);
     gpio_write(jmf_gpio_out,0);
     msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
 
@@ -335,24 +296,11 @@ int main(void)
     netdev->event_callback = _event_cb;
 
 //reset_cmd();
-    //lora_setup_cmd(500,7,5); // 500 kHz, SF=7 => 21875 bps CR=1..4 overhead 1.25, 1.5, 1.75, 2
-    lora_setup_cmd(250,7,5);   // 250 kHz, SF=8 => 6.25 kbps CR=1..4 overhead 1.25, 1.5, 1.75, 2
-    channel_cmd(868300000);     // CR fixed at 4/5 (CR=1) for LoRaWAN
-//  868300000 for DR6 (SF7BW250), see https://lora-alliance.org/wp-content/uploads/2021/05/RP002-1.0.3-FINAL-1.pdf
-    netopt_enable_t iq_inverted = NETOPT_DISABLE;
-    netdev->driver->set(netdev, NETOPT_IQ_INVERT, &iq_inverted, sizeof(netopt_enable_t));
+    lora_setup_cmd(500,7,5); // 500 kHz, SF=7 => 21875 bps
+    channel_cmd(868000000);
 
-//    sx127x_set_tx_power(&sx127x,20);                                                // 14
-    printf("PA: %d -- RFO is %d BOOST is %d\n",sx127x.params.paselect,SX127X_PA_RFO, SX127X_PA_BOOST); // 1 = PABOOST
-    printf("power: %d\n",sx127x_get_tx_power(&sx127x));                                                // 14
-#ifdef RXROVER
     for (indicedump=0x40023800;indicedump<0x40023BFF;indicedump+=4)
        {printf("%lx: %lx\n",indicedump,*(long*)(indicedump));}
-#endif            // dont print when wathdog is triggered on TX
-#ifdef with_wdt
-    wdt_setup_reboot(0, 5000); // MAX_TIME in ms
-    wdt_start();
-#endif
 #ifndef RXROVER
        {
         printf("THREAD_STACKSIZE_DEFAULT: %d\n",THREAD_STACKSIZE_DEFAULT);
@@ -372,15 +320,6 @@ int main(void)
                   indice=0;
                   printf("TX %d\n",compteurin);
                   gpio_write(jmf_gpio_out,1);
-/*
-                  if (validate_bandwidth!=0)
-                     { printf("PA: %d -- RFO is %d BOOST is %d\n",sx127x.params.paselect,SX127X_PA_RFO, SX127X_PA_BOOST); // 1 = PABOOST
-                       printf("power: %d\n",sx127x_get_tx_power(&sx127x));                                                // 14
-                     }
-*/
-#ifdef with_wdt
-                  wdt_kick();
-#endif
                   do{
                      if (compteurin>=SX127X_LORA_MSG_QUEUE)
                        {//puts(":");

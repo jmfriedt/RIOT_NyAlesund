@@ -1,7 +1,8 @@
 ##
 
-See configuring_ublox.md for instructions on how to configure the UBlox Zed-F9P GNSS receiver
-to communicate UBX sentences with a small enough payload to be transmitted by the LoRa modems.
+See <a href="configuring_ublox.md">configuring_ublox.md</a> for instructions on how to configure 
+the UBlox Zed-F9P GNSS receiver to communicate UBX sentences with a small enough payload to be 
+transmitted by the LoRa modems.
 
 <img src="circuits.png">
 
@@ -14,11 +15,15 @@ See https://github.com/CampusIoT/orbimote/tree/master/field_test_device for a pi
 
 ## Compiling
 
+Tested with commit 6bf6b6be6c4723b49f62550a35111e57b7426aa4 of RIOT-OS (Thu Aug 20 13:30:38 2020)
+
 ```
 CFLAGS="-DISR_STACK_SIZE=2048 -DSTDIO_UART_BAUDRATE=115200 -DSERIAL_BAUDRATE=115200" DRIVER=sx1272 BOARD=im880b make
 ```
 
 ## Flashing through serial port
+
+To set the bootloader mode, connect pin 2 of X2 to Vcc (center of X9) and hit the blue reset button.
 
 ```
 stm32flash -w bin/im880b/lora_GPS.bin /dev/ttyUSB0
