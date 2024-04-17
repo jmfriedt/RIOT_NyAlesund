@@ -27,22 +27,22 @@ lrwxrwxrwx 1 jmfriedt jmfriedt 12 Jun 23 10:03 com7 -> /dev/ttyACM1
 
 9. UBX-RXM-MEASX right click -> Disable Message. After that, only UBX-RXM-RAWX should be enabled
 
-<img src="ucenter_rawx.png">
+<img src="ucenter/ucenter_rawx.png">
 
 10. UBX-CFG-MSG -> select 02-15 RXM-RAWX and enable UART1, Send (USB should
 have been active already)
 
-<img src="ucenter_msg.png">
+<img src="ucenter/ucenter_msg.png">
 
 11. UBX-CFG-PRT -> Target 1-UART1: set Baudrate to 115200 and keep all other
 settings (8N1), Protocol In UBX only and Protocol Out UBX only (disable NMEA), Send
 
-<img src="ucenter_ports.png">
+<img src="ucenter/ucenter_ports.png">
 
 12. UBX-CFG-GNSS -> Disable QZSS, SBAS, Beidou and GLONASS, keeping only GPS (L11C/A) and 
 Galileo (E1) -- might not be necessary -- to reduce traffic, Send
 
-<img src="ucenter_gnss.png">
+<img src="ucenter/ucenter_gnss.png">
 
 13. UBX-CFG-CFG -> Save Current Configuration to (click on) FLASH, Send
 
@@ -62,4 +62,4 @@ While GPS remains active, we have not figured out how to disable L2C and keep on
 When testing, u-center will no longer display the position but the pseudoranges are still
 visible
 
-<img src="ucenter_pseudoranges.png">
+<img src="ucenter/ucenter_pseudoranges.png">
