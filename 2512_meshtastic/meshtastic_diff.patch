@@ -1,0 +1,40 @@
+diff --git a/platformio.ini b/platformio.ini
+index f9e2dd898..06324478d 100644
+--- a/platformio.ini
++++ b/platformio.ini
+@@ -2,7 +2,7 @@
+ ; https://docs.platformio.org/page/projectconf.html
+ 
+ [platformio]
+-default_envs = tbeam
++default_envs = wio-e5
+ 
+ extra_configs =
+ 	arch/*/*.ini
+diff --git a/src/mesh/RadioInterface.cpp b/src/mesh/RadioInterface.cpp
+index 3c0da4494..dc92dc844 100644
+--- a/src/mesh/RadioInterface.cpp
++++ b/src/mesh/RadioInterface.cpp
+@@ -53,7 +53,8 @@ const RegionInfo regions[] = {
+        AFA) to avoid a duty cycle. (Please refer to line P page 22 of this document.)
+        https://www.etsi.org/deliver/etsi_en/300200_300299/30022002/03.01.01_60/en_30022002v030101p.pdf
+      */
+-    RDEF(EU_868, 869.4f, 869.65f, 10, 0, 27, false, false, false),
++    // RDEF(EU_868, 869.4f, 869.65f, 10, 0, 27, false, false, false), JMF
++    RDEF(EU_868, 868.0f, 868.45f, 10, 0, 27, false, false, false),
+ 
+     /*
+         https://lora-alliance.org/wp-content/uploads/2020/11/lorawan_regional_parameters_v1.0.3reva_0.pdf
+diff --git a/src/mesh/RadioLibInterface.h b/src/mesh/RadioLibInterface.h
+index 833c88710..cab5c4a66 100644
+--- a/src/mesh/RadioLibInterface.h
++++ b/src/mesh/RadioLibInterface.h
+@@ -79,7 +79,7 @@ class RadioLibInterface : public RadioInterface, protected concurrency::Notified
+      * We now use 0x2b (so that someday we can possibly use NOT 2b - because that would be funny pun).  We will be staying with
+      * this code for a long time.
+      */
+-    const uint8_t syncWord = 0x2b;
++    const uint8_t syncWord = 0x34; // JMF 0x2b;
+ 
+     float currentLimit = 100; // 100mA OCP - Should be acceptable for RFM95/SX127x chipset.
+ 

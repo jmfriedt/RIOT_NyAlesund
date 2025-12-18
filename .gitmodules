@@ -1,0 +1,3 @@
+[submodule "2512_meshtastic/firmware"]
+	path = 2512_meshtastic/firmware
+	url = https://github.com/meshtastic/firmware
