@@ -33,6 +33,9 @@ Set the gateway messages to JSON to be readable (``marshaler="json"`` in
 ``chirpstack-gateway-bridge/30-integration.toml``) assuming the UDP Semtech
 forwarder was selected.
 
+On the host computer, edit ``/etc/chirpstack/region_eu868.toml`` and add ``v4_migrate=true` (host Chirpstack v4
+compatible with WifxL1 v3)
+
 Probe the MQTT broker with
 ```
 mosquitto_sub -v -h localhost -t "#"
