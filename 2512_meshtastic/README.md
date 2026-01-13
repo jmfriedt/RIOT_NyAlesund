@@ -56,7 +56,8 @@ portnum: TEXT_MESSAGE_APP
 payload: "Hello"
 bitfield: 0
 ```
-which is the correct payload.
+which is the correct payload. However, reception of the Meshtastic is random, and activating the DEBUG log output indicates
+that most (if not all) Meshtastic packet analysis fail with an erroneous CRC.
 
 ## iFemtoCell
 
@@ -77,4 +78,5 @@ payload: "hello world"
 portnum: TEXT_MESSAGE_APP
 payload: "got msg \'hello world\' with rxSnr: 7.5 and hopLimit: 3"
 ```
-since after the second message, a second endpoint was activated in ``--reply`` mode.
+since after the second message, a second endpoint was activated in ``--reply`` mode. All messages seem to be detected with this
+hardware.
