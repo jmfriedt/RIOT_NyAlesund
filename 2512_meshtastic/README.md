@@ -2,15 +2,15 @@
 
 ## Setup
 
-* WifxL1 gateway
+* WifxL1 or Kerlink iFemtoCell gateway
 * Wio-E5 mini boards acting as endpoints
 
 ## Meshtastic firmware
 
 https://github.com/meshtastic/firmware is a submodule of this project: apply
 the ``meshtastic_diff.patch`` to change the syncword (from 0x2b, default for Meshtastic,
-to 0x34 for LoRaWAN) and force the frequency to 868.{1,3} MHz in compliance
-with the gateway channels
+to 0x34 for LoRaWAN), force the frequency to 868.{1,3} MHz in compliance
+with the gateway channels and shrink the preamble word length from 16 to 8 bits.
 
 Force the endpoint configuration to match the gateway channel settings:
 ```
@@ -27,7 +27,7 @@ Once configured, send a message with
 meshtastic --sendtext "hello" --port /dev/ttyUSB1 
 ```
 
-## Gateway configuration
+## WifxL1 gateway configuration
 
 Set the gateway messages to JSON to be readable (``marshaler="json"`` in 
 ``chirpstack-gateway-bridge/30-integration.toml``) assuming the UDP Semtech
@@ -57,3 +57,24 @@ payload: "Hello"
 bitfield: 0
 ```
 which is the correct payload.
+
+## iFemtoCell
+
+No dedicated setting was selected on the iFemtoCell other than UDP broadcasting the packets to the network server compouter running the MQTT caster.
+
+Probing the MQTT caster:
+```
+eu868/gateway/7276ff0039070055/event/up{"phyPayload":"/////zQ+E1C92njIYm4AO4toKlutR2UwsW3eu0HQVt+g","txInfo":{"frequency":867700000,"modulation":{"lora":{"bandwidth":125000,"spreadingFactor":11,"codeRate":"CR_4_8"}}},"rxInfo":{"gatewayId":"7276ff0039070055","uplinkId":14339,"gwTime":"2026-01-12T16:50:18.879929Z","rssi":-112,"snr":-17,"channel":3,"board":3,"context":"LH6Q5A==","crcStatus":"CRC_OK"}}
+eu868/gateway/7276ff0039070055/event/up{"phyPayload":"/////zQ+E1AhI+eXYm4AOws9rOvN6v7MBNm7KpYwa5++","txInfo":{"frequency":867700000,"modulation":{"lora":{"bandwidth":125000,"spreadingFactor":11,"codeRate":"CR_4_8"}}},"rxInfo":{"gatewayId":"7276ff0039070055","uplinkId":16388,"gwTime":"2026-01-12T17:06:54.701878Z","rssi":-112,"snr":-14,"channel":3,"board":3,"context":"Z9maFA==","crcStatus":"CRC_OK"}}
+eu868/gateway/7276ff0039070055/event/up{"phyPayload":"/////snEVAk4VMCY24AO02i0sij70veblKVJ1Z3hF11ExheurpiPuEZDdBjMtM4FvPR9N2niYhA8IKxiQMLxlDIIXOerdwAn/rk","txInfo":{"frequency":867700000,"modulation":{"lora":{"bandwidth":125000,"spreadingFactor":11,"codeRate":"CR_4_8"}}},"rxInfo":{"gatewayId":"7276ff0039070055","uplinkId":16644,"gwTime":"2026-01-12T17:06:57.688590Z","rssi":-114,"snr":-15.5,"channel":3,"board":3,"context":"aAcs7A==","crcStatus":"CRC_OK"}}
+```
+which are correctly decoded respectively as
+```
+portnum: TEXT_MESSAGE_APP
+payload: "hello world"
+portnum: TEXT_MESSAGE_APP
+payload: "hello world"
+portnum: TEXT_MESSAGE_APP
+payload: "got msg \'hello world\' with rxSnr: 7.5 and hopLimit: 3"
+```
+since after the second message, a second endpoint was activated in ``--reply`` mode.
