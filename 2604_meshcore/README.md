@@ -112,7 +112,7 @@ Encrypted (no key available)
 Ciphertext: 68DD68564B354B8A5FE04E7A8C078014...
 ```
 
-Finally, a meshcore relay configured with
+Finally, a meshcore relay (repeater) configured with
 ```
 NODE_TYPE=repeater
 pio run -e ${BOARD}_${NODE_TYPE} -t upload
@@ -128,3 +128,10 @@ sensor cannot directly communicate with the WifxL1)
 
 Only when the relay is active does the network server receive packets from both gateways, demonstrating
 that the relay is working as expected.
+
+Connecting to the repeater to check the configuration:
+```
+meshcore-cli -s /dev/ttyUSB1 -r
+wio-e5-mini Repeater> get repeat
+  -> > on
+```
