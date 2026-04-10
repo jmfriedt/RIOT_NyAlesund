@@ -128,7 +128,8 @@ Message: "hello"
 Timestamp: 1775810972
 ```
 
-Once the private key for the public channel is known, we update the command with
+Once the private key for the public channel is known, we update the ``meshcore-decoder`` command
+by adding the ``--key`` option with
 ```
 meshcore-decoder 15001177c468dd68564b354b8a5fe04e7a8c07801451789940deb27bb88c6b1c57512a20d3 --key 8b3387e9c5cdea6ac9e5edbaa115cd72
 ```
