@@ -1,5 +1,17 @@
 # Meshcore relay to LoRaWAN gateway
 
+## Objective
+
+The objective is to relay measurements collected by sensor nodes (endpoints)
+to the LoRaWAN gateway (WifxL1 installed in Ny-Alesund, Spitsbergen) despite
+obstacles (mountains) between the sensors and the gateway. Relaying message
+has not been part of the initial LoRaWAN definition but this web page summarizes
+developments towards the use of Meshcore to achieve this result.
+
+<img src="objective.png">
+
+## Technical solution
+
 See <a href="https://gricad-gitlab.univ-grenoble-alpes.fr/meshtastic/meshcore/-/blob/main/build.md">
 this web page</a> on how to build ``meshcore``, and <a href="https://gricad-gitlab.univ-grenoble-alpes.fr/meshtastic/meshcore/-/blob/main/settings.lorawan.md">
 on how to update the configuration to be compatible with a LoRaWAN gateway</a> (tested with iFemtoCell and WifxL1).
