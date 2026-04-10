@@ -98,7 +98,7 @@ $ echo "FQARd8Ro3WhWSzVLil/gTnqMB4AUUXiZQN6ye7iMaxxXUSog0w=="| base64 -d | xxd
 00000010: 7a8c 0780 1451 7899 40de b27b b88c 6b1c  z....Qx.@..{..k.
 00000020: 5751 2a20 d3                             WQ* .
 ```
-and 
+and using <a href="https://github.com/michaelhart/meshcore-decoder">this library</a>:
 ```
 meshcore-decoder 15001177c468dd68564b354b8a5fe04e7a8c07801451789940deb27bb88c6b1c57512a20d3
 === MeshCore Packet Analysis ===
