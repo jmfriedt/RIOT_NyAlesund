@@ -47,6 +47,9 @@ will provide a function interface for communicating with meshcore. To do so:
 pip install meshcore-cli
 meshcore-cli -l
 meshcore-cli -s /dev/ttyUSB3 infos
+```
+resulting in
+```
 INFO:meshcore:Connected to B7630D6C running on a v1.14.1 fw.
 {
     "adv_type": 1,
@@ -110,6 +113,19 @@ Total Bytes: 37
 Channel Hash: 11
 Encrypted (no key available)
 Ciphertext: 68DD68564B354B8A5FE04E7A8C078014...
+```
+
+but Olivier Testault identified <a href="https://pypi.org/project/meshcoredecoder">this library</a>
+which does allow for decoding the public channel payload as demonstrated with
+```
+python3 decode.py
+```
+where ``hex_data = '15001177c468dd68564b354b8a5fe04e7a8c07801451789940deb27bb88c6b1c57512a20d3'``
+is the data to be decoded, resulting in
+```
+Sender: B7630D6C
+Message: "hello"
+Timestamp: 1775810972
 ```
 
 Finally, a meshcore relay (repeater) configured with
