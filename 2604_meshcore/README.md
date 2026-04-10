@@ -128,6 +128,29 @@ Message: "hello"
 Timestamp: 1775810972
 ```
 
+Once the private key for the public channel is known, we update the command with
+```
+meshcore-decoder 15001177c468dd68564b354b8a5fe04e7a8c07801451789940deb27bb88c6b1c57512a20d3 --key 8b3387e9c5cdea6ac9e5edbaa115cd72
+```
+resulting in
+```
+=== MeshCore Packet Analysis ===
+
+Valid Packet
+Message Hash: 1B7ABC17
+Route Type: Flood
+Payload Type: GroupText
+Total Bytes: 37
+
+=== Payload Details ===
+Channel Hash: 11
+Decrypted Message:
+Sender: B7630D6C
+Message: "hello"
+Timestamp: 2026-04-10T08:49:32.000Z
+```
+which is again correctly decoded.
+
 Finally, a meshcore relay (repeater) configured with
 ```
 NODE_TYPE=repeater
