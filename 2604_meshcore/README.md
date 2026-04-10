@@ -112,7 +112,12 @@ Encrypted (no key available)
 Ciphertext: 68DD68564B354B8A5FE04E7A8C078014...
 ```
 
-Finally, a meshcore relay is acting as expected:
+Finally, a meshcore relay configured with
+```
+NODE_TYPE=repeater
+pio run -e ${BOARD}_${NODE_TYPE} -t upload
+```
+is acting as expected:
 * the iFemtoCell is fitted with an antenna and can receive messages from all nodes in the lab
 * the WifxL1 is fitted with a 50 ohm load and can only receive messages from nodes fitted with an antenna
 * one node acting as sensor is fitted with a 50 ohm load instead of the antenna and shielded in a metallic box (this
