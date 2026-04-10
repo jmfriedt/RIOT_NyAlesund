@@ -12,15 +12,37 @@ the ``meshtastic_diff.patch`` to change the syncword (from 0x2b, default for Mes
 to 0x34 for LoRaWAN) and force the frequency to 868.{1,3} MHz in compliance
 with the gateway channels
 
-Force the endpoint configuration to match the gateway channel settings:
+Force the endpoint configuration to match the gateway "join" channel settings:
 ```
 meshtastic --set lora.modem_preset LONG_MODERATE \
            --set lora.bandwidth 125 \
-           --set lora.spreadFactor 9 \
+           --set lora.spreadFactor 11 \
+           --set lora.coding_rate 4 \
            --set lora.region EU_868 --port /dev/ttyUSB1
 ```
 
 Notice: the Wio-E5 mini does not allow setting the frequency with ``--set lora.override_frequency 868100000`` since this option leads to an error message ``error reason: NO_INTERFACE``
+
+The configuration should look like 
+```
+meshtastic --info --port /dev/ttyUSB0 | grep -A15 lora
+  "lora": {
+    "usePreset": true,
+    "modemPreset": "LONG_MODERATE",
+    "bandwidth": 125,
+    "spreadFactor": 11,
+    "codingRate": 8,
+    "region": "EU_868",
+    "hopLimit": 3,
+    "txEnabled": true,
+    "txPower": 27,
+    "sx126xRxBoostedGain": true,
+    "ignoreMqtt": true,
+    "frequencyOffset": 0.0,
+    "channelNum": 0,
+    "overrideDutyCycle": false,
+    "overrideFrequency": 0.0,
+```
 
 Once configured, send a message with
 ```
