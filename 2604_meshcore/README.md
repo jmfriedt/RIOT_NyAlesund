@@ -10,7 +10,7 @@ developments towards the use of Meshcore to achieve this result.
 
 <img src="objective.png">
 
-## Technical solution
+## Technical solution: Meshcore compilation
 
 See <a href="https://gricad-gitlab.univ-grenoble-alpes.fr/meshtastic/meshcore/-/blob/main/build.md">
 this web page</a> on how to build ``meshcore``, and <a href="https://gricad-gitlab.univ-grenoble-alpes.fr/meshtastic/meshcore/-/blob/main/settings.lorawan.md">
@@ -162,6 +162,8 @@ Timestamp: 2026-04-10T08:49:32.000Z
 ```
 which is again correctly decoded.
 
+## Meshcore packet repetition
+
 Finally, a meshcore relay (repeater) configured with
 ```
 NODE_TYPE=repeater
@@ -185,6 +187,8 @@ meshcore-cli -s /dev/ttyUSB1 -r
 wio-e5-mini Repeater> get repeat
   -> > on
 ```
+
+## Meshcore sensor node
 
 When a sensor node is added:
 ```
