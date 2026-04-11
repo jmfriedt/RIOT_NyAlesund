@@ -259,7 +259,7 @@ for i in `cat file.txt` ;do if [[ $i == "2026"* ]]; then echo -n $i " ";else ech
 2026-04-11T12:29:23  @..)...e........I.....MO.%
 2026-04-11T12:29:24  @.+Z...H...6]............"
 ```
-and on a longer run, keeping only the ``wio`` entries:
+and on a longer run, keeping only the ``wio`` entries (scroll right to see the node name):
 ```
 2026-04-11T12:41:36  ..`......R0.$c.!...A.VQ.m..P.7(.. ..Ef ...I..9-Q...'!K0P..o...1?i.IZY?.YcZ..c...t......WF..6......]p...........wio-e5-mini Sensor
 2026-04-11T12:42:36  ..E...e............4.L...6..-....4..Ef.k....5..b..8G....R.]se.2A&....d.-.n.....d2.og.q..]b.]..n.....w..........wio-e5-mini Repeater
@@ -304,7 +304,7 @@ cat mosquitto.log | cut -c 1-20,226-550 | sed 's/+/ /1' | cut -d, -f1 | sed 's/\
 for i in `cat tmp` ;do if [[ $i == "2026"* ]]; then echo -n $i " ";else echo $i | grep -v 2026 | base64 -d | xxd  -c 256 -g0 | tr -s ' ' | cut -d\  -f3-;fi;done > output
 cat output | grep wio
 ```
-displays
+displays (scroll right to see the node name)
 ```
 2026-04-11T15:05:32  ..`......R0.$c.!...A.VQ.m..P.7(.. X.Df....\W......A.!.P[6...2....,!wN.|..9..G...............$..#X_.Gh..........wio-e5-mini Sensor
 2026-04-11T15:06:20  .....%H..E.i.....jA..ww...JObf?...h.Dff.w..L.......Q.L.q..H......;.4'.........K.....;.;RR....le.".Q............wio-e5-mini Sensor2
@@ -333,7 +333,7 @@ displays
 2026-04-11T15:29:25  ..`......R0.$c.!...A.VQ.m..P.7(.. ..Df....-...6<.[.y].4.<nA.....h.8...;..XO.]iQ..D"..n*{L(r}..Sywy.............wio-e5-mini Sensor
 2026-04-11T15:30:18  .....%H..E.i.....jA..ww...JObf?.....Df..%..T.~H.p..-R.8...&c..t.L(/>....8..<.|=JT...s9..*..z.\..t.u.[..........wio-e5-mini Sensor2
 ```
-and on the ``companion_radio_usb`` node with ``meshcore-cli:
+and on the ``companion_radio_usb`` node with ``meshcore-cli``:
 ```
 list
 wio-e5-mini Sensor               SENS  607f8e86191a  Flood
