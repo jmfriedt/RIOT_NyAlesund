@@ -345,3 +345,42 @@ wio-e5-mini Repeater             REP   458a0fe565bf  Flood
 wio-e5-mini Sensor2              SENS  c0ad9325481b  Flood
 wio-e5-mini Sensor3              SENS  7988003d1401  Flood
 ```
+
+## Periodic sensor acquisition
+
+An attempt at *initiating* sensor measurement broadcast from a sensor node by regstering
+and event. The proposed changes are the registration of a new alert in ``examples/simple_sensor/main.cpp`` with
+```
++#ifndef SENSOR_READ_INTERVAL_SECS
++#define SENSOR_READ_INTERVAL_SECS  60
++#endif
+
+void onSensorDataRead() override {
+  Trigger periodic;
+...
+  alertIf(getRTCClock()->getCurrentTime() - last_read_timeJMF >= SENSOR_READ_INTERVAL_SECS, periodic, LOW_PRI_ALERT, "Periodic");
+...
+}
+
+```
+and an uggly hack to force the even to be processed in ``examples/simple_sensor/SensorMesh.cpp``
+by testing the first character of the message
+```
+void SensorMesh::alertIf(bool condition, Trigger& t, AlertPriority pri, const char* text) {
+  if (text[0]=='P')       // force periodic
+    { StrHelper::strncpy(t.text, text, sizeof(t.text));
+      t.pri = pri;
+      t.send_expiry = 0;  // signal that initial send is needed
+      t.attempt = 3;      // /!\ was 4 (number of message = 4 - t.attempt
+      t.curr_contact_idx = -1;  // start iterating thru contacts[]
+      alert_tasks[num_alert_tasks++] = &t;  // add to queue
+    }
+  if (condition) {
+...
+```
+
+Although this allows for periodically (once every minute) propagate a message, it has
+not been demonstrated yet that this message is indeed routed by the repeaters. More
+worrying however, https://nodakmesh.org/blog/easyskymesh-power-efficient-meshcore-firmware/
+states "A LoRa repeater idling at 8-10mA..." which is an insane power consumption for an
+autonomous embedded board: at least 1000x improvement is needed for field deployment.
