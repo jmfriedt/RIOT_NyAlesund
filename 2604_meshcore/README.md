@@ -379,6 +379,8 @@ void SensorMesh::alertIf(bool condition, Trigger& t, AlertPriority pri, const ch
 ...
 ```
 
+## Power management
+
 Although this allows for periodically (once every minute) propagate a message, it has
 not been demonstrated yet that this message is indeed routed by the repeaters. More
 worrying however, https://nodakmesh.org/blog/easyskymesh-power-efficient-meshcore-firmware/
