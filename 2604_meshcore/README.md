@@ -384,3 +384,96 @@ not been demonstrated yet that this message is indeed routed by the repeaters. M
 worrying however, https://nodakmesh.org/blog/easyskymesh-power-efficient-meshcore-firmware/
 states "A LoRa repeater idling at 8-10mA..." which is an insane power consumption for an
 autonomous embedded board: at least 1000x improvement is needed for field deployment.
+
+Some resources about power management on the STM32 fitted on the Wio-E5-mini: https://wiki.seeedstudio.com/LoRa_E5_mini/#freertos-lowpower and https://github.com/limbongofficial/STM32_Core-Arduino/blob/master/cores/arduino/stm32/low_power.c
+
+```
+static UART_HandleTypeDef *WakeUpUart = NULL;
+static void (*WakeUpUartCb)(void) = NULL;
+
+WEAK void SystemClock_ConfigFromStop(void)
+{
+  SystemClock_Config();
+}
+
+void LowPower_sleep(uint32_t regulator)
+{
+  /*
+   * Suspend Tick increment to prevent wakeup by Systick interrupt.
+   * Otherwise the Systick interrupt will wake up the device within
+   * 1ms (HAL time base)
+   */
+  HAL_SuspendTick();
+  /* Enter Sleep Mode , wake up is done once User push-button is pressed */
+  HAL_PWR_EnterSLEEPMode(regulator, PWR_SLEEPENTRY_WFI);
+  /* Resume Tick interrupt if disabled prior to SLEEP mode entry */
+  HAL_ResumeTick();
+  if (WakeUpUartCb != NULL) {
+    WakeUpUartCb();
+  }
+}
+
+void LowPower_standby()
+{
+  __disable_irq();
+  HAL_PWR_EnterSTANDBYMode();
+}
+
+void LowPower_stop(serial_t *obj)
+{
+  __disable_irq();
+
+#if defined(UART_IT_WUF) && defined(HAL_UART_MODULE_ENABLED)
+  if (WakeUpUart != NULL) {
+    HAL_UARTEx_EnableStopMode(WakeUpUart);
+  }
+#endif
+
+#if defined(STM32L0xx) || defined(STM32L1xx)
+  /* Enable Ultra low power mode */
+  HAL_PWREx_EnableUltraLowPower();
+
+  /* Enable the fast wake up from Ultra low power mode */
+  HAL_PWREx_EnableFastWakeUp();
+#endif
+#ifdef __HAL_RCC_WAKEUPSTOP_CLK_CONFIG
+  /* Select HSI as system clock source after Wake Up from Stop mode */
+  __HAL_RCC_WAKEUPSTOP_CLK_CONFIG(RCC_STOP_WAKEUPCLOCK_HSI);
+#endif
+
+  /* Enter Stop mode */
+  HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFI);
+
+  /* Exit Stop mode reset clocks */
+  SystemClock_ConfigFromStop();
+#if defined(UART_IT_WUF) && defined(HAL_UART_MODULE_ENABLED)
+  if (WakeUpUart != NULL) {
+    /* In case of WakeUp from UART, reset its clock source to HSI */
+    uart_config_lowpower(obj);
+    HAL_UARTEx_DisableStopMode(WakeUpUart);
+  }
+#else
+  UNUSED(obj);
+#endif
+  __enable_irq();
+
+  HAL_Delay(10);
+
+  if (WakeUpUartCb != NULL) {
+    WakeUpUartCb();
+  }
+}
+```
+
+and in the ``void setup()``
+
+```
+  HAL_PWR_EnableBkUpAccess();
+  __HAL_RCC_WAKEUPSTOP_CLK_CONFIG(RCC_STOP_WAKEUPCLOCK_HSI);
+  if (__HAL_PWR_GET_FLAG(PWR_FLAG_SB) != RESET) {
+    /* Clear Standby flag */
+    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB);
+  }
+  __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
+```
+will compile in the meshcore source tree.
