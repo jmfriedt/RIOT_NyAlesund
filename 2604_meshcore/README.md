@@ -29,7 +29,7 @@ the command line installer script</a>.
 
 The first time we wish to overwrite the default Seeedstudio E5-mini firmware, we get the
 error message ``Error: stm32x device protected``. Removing the protection is achieved
-with OpenOCD:
+with OpenOCD: **while pushing** on the RESET button, execute ``openocd`` with
 ```
 $ openocd -d2 -s $HOME/.platformio/packages/tool-openocd/openocd/scripts -f interface/stlink.cfg -c "transport select hla_swd" -f target/stm32wlx.cfg
 $ telnet localhost 4444
