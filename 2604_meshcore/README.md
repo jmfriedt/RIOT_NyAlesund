@@ -54,7 +54,7 @@ BOARD=wio-e5-mini
 NODE_TYPE=companion_radio_usb
 pio run -e ${BOARD}_${NODE_TYPE} -t upload
 ```
-will provide a function interface for communicating with meshcore. To do so:
+will provide a functional interface for communicating with meshcore. To do so:
 ```
 pip install meshcore-cli
 meshcore-cli -l
