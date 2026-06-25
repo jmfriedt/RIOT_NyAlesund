@@ -1,0 +1,169 @@
+diff --git a/examples/simple_sensor/SensorMesh.cpp b/examples/simple_sensor/SensorMesh.cpp
+index 57d23a31..f88c1435 100644
+--- a/examples/simple_sensor/SensorMesh.cpp
++++ b/examples/simple_sensor/SensorMesh.cpp
+@@ -240,6 +240,7 @@ uint8_t SensorMesh::handleRequest(uint8_t perms, uint32_t sender_timestamp, uint
+ mesh::Packet* SensorMesh::createSelfAdvert() {
+   uint8_t app_data[MAX_ADVERT_DATA_SIZE];
+   uint8_t app_data_len = _cli.buildAdvertData(ADV_TYPE_SENSOR, app_data);
++  Serial.print("JMF createSelfAdvert\r\n");
+ 
+   return createAdvert(self_id, app_data, app_data_len);
+ }
+@@ -269,6 +270,20 @@ void SensorMesh::sendAlert(const ClientInfo* c, Trigger* t) {
+ }
+ 
+ void SensorMesh::alertIf(bool condition, Trigger& t, AlertPriority pri, const char* text) {
++  if (text[0]=='P') // JMF force periodic
++    {
++      StrHelper::strncpy(t.text, text, sizeof(t.text));
++      t.pri = pri;
++      t.send_expiry = 0;  // signal that initial send is needed
++      t.attempt = 3;      // JMF was 4
++      t.curr_contact_idx = -1;  // start iterating thru contacts[]
++
++      alert_tasks[num_alert_tasks++] = &t;  // add to queue
++
++      Serial.print(getRTCClock()->getCurrentTime());
++      Serial.print(num_alert_tasks);
++      Serial.print("\tJMF alert create\t");
++    }
+   if (condition) {
+     if (!t.isTriggered() && num_alert_tasks < MAX_CONCURRENT_ALERTS) {
+       StrHelper::strncpy(t.text, text, sizeof(t.text));
+@@ -295,6 +310,8 @@ void SensorMesh::alertIf(bool condition, Trigger& t, AlertPriority pri, const ch
+       }
+     }
+   }
++  Serial.print(num_alert_tasks);
++  Serial.print("\r\n");
+ }
+ 
+ float SensorMesh::getAirtimeBudgetFactor() const {
+@@ -934,6 +951,7 @@ void SensorMesh::loop() {
+       } else if (t->curr_contact_idx < acl.getNumClients()) {
+         auto c = acl.getClientByIdx(t->curr_contact_idx);   // send next attempt
+         sendAlert(c, t);  // NOTE: modifies attempt, expected_acks[] and send_expiry
++        Serial.print("JMF sendAlert\r\n");
+       } else {
+         // contact list has likely been modified while waiting for alert ACK, cancel this task
+         t->attempt = 4;   // next ::loop() will remove t from queue
+diff --git a/examples/simple_sensor/SensorMesh.h b/examples/simple_sensor/SensorMesh.h
+index bb786b2a..35163fb7 100644
+--- a/examples/simple_sensor/SensorMesh.h
++++ b/examples/simple_sensor/SensorMesh.h
+@@ -129,6 +129,7 @@ protected:
+   void onAckRecv(mesh::Packet* packet, uint32_t ack_crc) override;
+   virtual bool handleIncomingMsg(ClientInfo& from, uint32_t timestamp, uint8_t* data, uint8_t flags, size_t len);
+   void sendAckTo(const ClientInfo& dest, uint32_t ack_hash, uint8_t path_hash_size=1);
++  uint32_t last_read_timeJMF, currJMF;
+ private:
+   FILESYSTEM* _fs;
+   unsigned long next_local_advert, next_flood_advert;
+diff --git a/examples/simple_sensor/main.cpp b/examples/simple_sensor/main.cpp
+index 330adcc2..5ca3f5f3 100644
+--- a/examples/simple_sensor/main.cpp
++++ b/examples/simple_sensor/main.cpp
+@@ -5,6 +5,10 @@
+   static UITask ui_task(display);
+ #endif
+ 
++#ifndef SENSOR_READ_INTERVAL_SECS
++#define SENSOR_READ_INTERVAL_SECS  60
++#endif
++
+ class MyMesh : public SensorMesh {
+ public:
+   MyMesh(mesh::MainBoard& board, mesh::Radio& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, mesh::MeshTables& tables)
+@@ -15,7 +19,7 @@ public:
+ 
+ protected:
+   /* ========================== custom logic here ========================== */
+-  Trigger low_batt, critical_batt;
++  Trigger low_batt, critical_batt, periodic;
+   TimeSeriesData  battery_data;
+ 
+   void onSensorDataRead() override {
+@@ -24,6 +28,7 @@ protected:
+     battery_data.recordData(getRTCClock(), batt_voltage);   // record battery
+     alertIf(batt_voltage < 3.4f, critical_batt, HIGH_PRI_ALERT, "Battery is critical!");
+     alertIf(batt_voltage < 3.6f, low_batt, LOW_PRI_ALERT, "Battery is low");
++    alertIf(getRTCClock()->getCurrentTime() - last_read_timeJMF >= SENSOR_READ_INTERVAL_SECS, periodic, LOW_PRI_ALERT, "Periodic JMF");
+   }
+ 
+   int querySeriesData(uint32_t start_secs_ago, uint32_t end_secs_ago, MinMaxAvg dest[], int max_num) override {
+diff --git a/platformio.ini b/platformio.ini
+index ba601c26..3ea27fc2 100644
+--- a/platformio.ini
++++ b/platformio.ini
+@@ -24,9 +24,9 @@ lib_deps =
+   melopero/Melopero RV3028 @ ^1.1.0
+   electroniccats/CayenneLPP @ 1.6.1
+ build_flags = -w -DNDEBUG -DRADIOLIB_STATIC_ONLY=1 -DRADIOLIB_GODMODE=1
+-  -D LORA_FREQ=869.618
+-  -D LORA_BW=62.5
+-  -D LORA_SF=8
++  -D LORA_FREQ=868.1
++  -D LORA_BW=125
++  -D LORA_SF=7
+   -D ENABLE_ADVERT_ON_BOOT=1
+   -D ENABLE_PRIVATE_KEY_IMPORT=1   ; NOTE: comment these out for more secure firmware
+   -D ENABLE_PRIVATE_KEY_EXPORT=1
+diff --git a/src/helpers/radiolib/CustomSX1262.h b/src/helpers/radiolib/CustomSX1262.h
+index ad201229..f4e6b759 100644
+--- a/src/helpers/radiolib/CustomSX1262.h
++++ b/src/helpers/radiolib/CustomSX1262.h
+@@ -42,11 +42,11 @@ class CustomSX1262 : public SX1262 {
+       if (spi) spi->begin(P_LORA_SCLK, P_LORA_MISO, P_LORA_MOSI);
+     #endif
+   #endif
+-      int status = begin(LORA_FREQ, LORA_BW, LORA_SF, cr, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 16, tcxo);
++      int status = begin(LORA_FREQ, LORA_BW, LORA_SF, cr, RADIOLIB_SX126X_SYNC_WORD_PUBLIC, LORA_TX_POWER, 8, tcxo);
+       // if radio init fails with -707/-706, try again with tcxo voltage set to 0.0f
+       if (status == RADIOLIB_ERR_SPI_CMD_FAILED || status == RADIOLIB_ERR_SPI_CMD_INVALID) {
+         tcxo = 0.0f;
+-        status = begin(LORA_FREQ, LORA_BW, LORA_SF, cr, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 16, tcxo);
++        status = begin(LORA_FREQ, LORA_BW, LORA_SF, cr, RADIOLIB_SX126X_SYNC_WORD_PUBLIC, LORA_TX_POWER, 8, tcxo);
+       }
+       if (status != RADIOLIB_ERR_NONE) {
+         Serial.print("ERROR: radio init failed: ");
+@@ -97,4 +97,4 @@ class CustomSX1262 : public SX1262 {
+       readRegister(RADIOLIB_SX126X_REG_RX_GAIN, &rxGain, 1);
+       return (rxGain == RADIOLIB_SX126X_RX_GAIN_BOOSTED);
+     }
+-};
+\ No newline at end of file
++};
+diff --git a/variants/wio-e5-mini/platformio.ini b/variants/wio-e5-mini/platformio.ini
+index 83784443..62b22a9a 100644
+--- a/variants/wio-e5-mini/platformio.ini
++++ b/variants/wio-e5-mini/platformio.ini
+@@ -30,7 +30,7 @@ build_src_filter = ${lora_e5_mini.build_src_filter}
+ extends = lora_e5_mini
+ build_flags = ${lora_e5_mini.build_flags}
+   -D LORA_TX_POWER=22
+-  -D ADVERT_NAME='"wio-e5-mini Sensor"'
++  -D ADVERT_NAME='"wio-e5-mini Sensor3"'
+   -D ADMIN_PASSWORD='"password"'
+ build_src_filter = ${lora_e5_mini.build_src_filter}
+   +<../examples/simple_sensor>
+diff --git a/variants/wio-e5-mini/target.cpp b/variants/wio-e5-mini/target.cpp
+index 2e95ad6d..cba27472 100644
+--- a/variants/wio-e5-mini/target.cpp
++++ b/variants/wio-e5-mini/target.cpp
+@@ -33,7 +33,7 @@ bool radio_init() {
+ 
+   radio.setRfSwitchTable(rfswitch_pins, rfswitch_table);
+ 
+-  int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 16, 1.7, 0);
++  int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PUBLIC, LORA_TX_POWER, 8, 1.7, 0);
+ 
+   if (status != RADIOLIB_ERR_NONE) {
+     Serial.print("ERROR: radio init failed: ");
+@@ -91,4 +91,4 @@ bool WIOE5SensorManager::begin() {
+   has_bme = bme.begin();
+ 
+   return has_bme;
+-}
+\ No newline at end of file
++}
