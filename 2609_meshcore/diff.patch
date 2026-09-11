@@ -1,0 +1,296 @@
+diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
+index 7d0179f3..5d714ef8 100644
+--- a/examples/simple_repeater/MyMesh.cpp
++++ b/examples/simple_repeater/MyMesh.cpp
+@@ -211,6 +211,10 @@ uint8_t MyMesh::handleAnonClockReq(const mesh::Identity& sender, uint32_t sender
+ int MyMesh::handleRequest(ClientInfo *sender, uint32_t sender_timestamp, uint8_t *payload, size_t payload_len) {
+   // uint32_t now = getRTCClock()->getCurrentTimeUnique();
+   // memcpy(reply_data, &now, 4);   // response packets always prefixed with timestamp
++char buf[245];
++sprintf(buf,"JMF: handleRequest %x\r\n",payload[0]);
++Serial.print(buf);
++
+   memcpy(reply_data, &sender_timestamp, 4); // reflect sender_timestamp back in response packet (kind of like a 'tag')
+ 
+   if (payload[0] == REQ_TYPE_GET_STATUS) {  // guests can also access this now
+@@ -411,6 +415,7 @@ bool MyMesh::isLooped(const mesh::Packet* packet, const uint8_t max_counters[])
+ }
+ 
+ void MyMesh::sendFloodReply(mesh::Packet* packet, unsigned long delay_millis, uint8_t path_hash_size) {
++Serial.print("JMF send flood reply\r\n");
+   TransportKey req_scope;
+   bool is_wildcard = recv_pkt_region != NULL && recv_pkt_region->isWildcard();
+   bool req_scope_known = recv_pkt_region != NULL && !is_wildcard
+@@ -432,6 +437,8 @@ void MyMesh::sendFloodReply(mesh::Packet* packet, unsigned long delay_millis, ui
+ }
+ 
+ bool MyMesh::allowPacketForward(const mesh::Packet *packet) {
++Serial.print("JMF allow packet fwd\r\n"); 
++return true; // JMF
+   if (_prefs.disable_fwd) return false;
+   if (packet->isRouteFlood()
+       && mesh::isFloodHopLimitExceeded(packet, _prefs.flood_max, _prefs.flood_max_unscoped, _prefs.flood_max_advert)) {
+@@ -482,7 +489,12 @@ void MyMesh::logRx(mesh::Packet *pkt, int len, float score) {
+     bridge.sendPacket(pkt);
+   }
+ #endif
+-
++// --- Marwane Ajout ---
++       Serial.printf("\r\n>>> [REPEATER] Paquet recu ! Type: %d | RSSI: %d | Hops: %d <<<\r\n", 
++                pkt->getPayloadType(), 
++                (int)_radio->getLastRSSI(), 
++                pkt->getPathHashCount());
++//------------------------------------------
+   if (_logging) {
+     File f = openAppend(PACKET_LOG_FILE);
+     if (f) {
+@@ -503,6 +515,10 @@ void MyMesh::logRx(mesh::Packet *pkt, int len, float score) {
+ }
+ 
+ void MyMesh::logTx(mesh::Packet *pkt, int len) {
++// --- Marwane Ajout ---
++  Serial.printf("\r\n<<< [REPEATER] Paquet transmis (TX) ! Type: %d <<<\r\n", pkt->getPayloadType());
++// ------------------------------
++
+ #ifdef WITH_BRIDGE
+   if (_prefs.bridge_pkt_src == 0) {
+     bridge.sendPacket(pkt);
+@@ -570,6 +586,7 @@ mesh::DispatcherAction MyMesh::onRecvPacket(mesh::Packet* pkt) {
+ 
+ void MyMesh::onAnonDataRecv(mesh::Packet *packet, const uint8_t *secret, const mesh::Identity &sender,
+                             uint8_t *data, size_t len) {
++Serial.print("JMF anon data recv\r\n");
+   if (packet->getPayloadType() == PAYLOAD_TYPE_ANON_REQ) { // received an initial request by a possible admin
+                                                            // client (unknown at this stage)
+     uint32_t timestamp;
+@@ -654,6 +671,10 @@ void MyMesh::onAdvertRecv(mesh::Packet *packet, const mesh::Identity &id, uint32
+   // if this a zero hop advert (and not via 'Share'), add it to neighbours
+   if (packet->getPathHashCount() == 0 && !isShare(packet)) {
+     AdvertDataParser parser(app_data, app_data_len);
++    // --- MARWANE AJOUT : On accepte les Repeaters ET les Sensors JE CROIS QUE LE REPEATER EST UN PEU RACISTE ET RETOURNE QUE LES AUTRES REPEATER---
++    Serial.printf("\r\n<<< [REPEATER] parser.isValid ! %d <<<\r\n", parser.isValid());
++
++
+     if (parser.isValid() && parser.getType() == ADV_TYPE_REPEATER) { // just keep neigbouring Repeaters
+       putNeighbour(id, timestamp, packet->getSNR());
+     }
+@@ -668,6 +689,7 @@ void MyMesh::onPeerDataRecv(mesh::Packet *packet, uint8_t type, int sender_idx,
+     return;
+   }
+   ClientInfo* client = acl.getClientByIdx(i);
++Serial.print("JMF peer data recv\r\n");
+ 
+   if (type == PAYLOAD_TYPE_REQ) { // request (from a Known admin client!)
+     uint32_t timestamp;
+@@ -766,6 +788,7 @@ void MyMesh::onPeerDataRecv(mesh::Packet *packet, uint8_t type, int sender_idx,
+ bool MyMesh::onPeerPathRecv(mesh::Packet *packet, int sender_idx, const uint8_t *secret, uint8_t *path,
+                             uint8_t path_len, uint8_t extra_type, uint8_t *extra, uint8_t extra_len) {
+   // TODO: prevent replay attacks
++Serial.print("JMF peer path recv\r\n");
+   int i = matching_peer_indexes[sender_idx];
+ 
+   if (i >= 0 && i < acl.getNumClients()) { // get from our known_clients table (sender SHOULD already be known in this context)
+@@ -788,6 +811,7 @@ bool MyMesh::onPeerPathRecv(mesh::Packet *packet, int sender_idx, const uint8_t
+ 
+ void MyMesh::onControlDataRecv(mesh::Packet* packet) {
+   uint8_t type = packet->payload[0] & 0xF0;    // just test upper 4 bits
++Serial.print("JMF ctrl data recv\r\n");
+   if (type == CTL_TYPE_NODE_DISCOVER_REQ && packet->payload_len >= 6
+       && !_prefs.disable_fwd && discover_limiter.allow(rtc_clock.getCurrentTime())
+   ) {
+@@ -843,6 +867,7 @@ void MyMesh::onControlDataRecv(mesh::Packet* packet) {
+ }
+ 
+ void MyMesh::sendNodeDiscoverReq() {
++Serial.print("JMF sendNodeDiscovery\r\n");
+   uint8_t data[10];
+   data[0] = CTL_TYPE_NODE_DISCOVER_REQ; // prefix_only=0
+   data[1] = (1 << ADV_TYPE_REPEATER);
+@@ -1050,6 +1075,7 @@ void MyMesh::updateAdvertTimer() {
+ }
+ 
+ void MyMesh::updateFloodAdvertTimer() {
++Serial.print("JMF flood advert\r\n");
+   if (_prefs.flood_advert_interval > 0) { // schedule flood advert timer
+     next_flood_advert = futureMillis(((uint32_t)_prefs.flood_advert_interval) * 60 * 60 * 1000);
+   } else {
+@@ -1285,6 +1311,23 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+ }
+ 
+ void MyMesh::loop() {
++// --- AJOUT : AFFICHAGE AUTOMATIQUE DES VOISINS Marwane a été ici---
++  static unsigned long next_auto_dump = 0;
++  if (next_auto_dump == 0 || millisHasNowPassed(next_auto_dump)) {
++    char reply[512] = {0};
++    formatNeighborsReply(reply);
++    
++    // On n'affiche que s'il y a au moins un voisin trouvé
++    if (strlen(reply) > 0) {
++      Serial.printf("\n[AUTO-DISCOVERY] Voisins actuels : %s\n", reply);
++    } else {
++      Serial.println("\n[AUTO-DISCOVERY] Aucun voisin détecté pour le moment...");
++    }
++    
++    // Programme le prochain affichage dans 30 secondes (30000 ms)
++    next_auto_dump = futureMillis(30000); 
++  }
++  // -------------------------------------------------
+ #ifdef WITH_BRIDGE
+   bridge.loop();
+ #endif
+diff --git a/examples/simple_sensor/main.cpp b/examples/simple_sensor/main.cpp
+index 69182f3a..b2fc6000 100644
+--- a/examples/simple_sensor/main.cpp
++++ b/examples/simple_sensor/main.cpp
+@@ -34,7 +34,22 @@ protected:
+   bool handleCustomCommand(uint32_t sender_timestamp, char* command, char* reply) override {
+     if (strcmp(command, "magic") == 0) {    // example 'custom' command handling
+       strcpy(reply, "**Magic now done**");
+-      return true;   // handled
++      return true; // handled
++    } else if (strcmp(command, "temp") == 0) {
++      CayenneLPP telem(25);
++      sensors.querySensors(TELEM_PERM_ENVIRONMENT, telem);
++      uint8_t *buf = telem.getBuffer();
++
++      while (*buf != LPP_TEMPERATURE) {
++        buf++;
++      }
++      buf++;
++
++      int16_t temperature = (*buf << 8) | *(buf + 1);
++
++      sprintf(reply, "measured temperature : %d.%d °C", temperature / 10, temperature % 10);
++      // strcpy(reply, "measured temperature: ");
++      return true; // handled
+     }
+     return false;  // not handled
+   }
+@@ -52,6 +67,8 @@ void halt() {
+ 
+ static char command[160];
+ 
++static uint32_t send_temperature_timer = 0;
++
+ void setup() {
+   Serial.begin(115200);
+   delay(1000);
+@@ -118,6 +135,9 @@ void setup() {
+ #if ENABLE_ADVERT_ON_BOOT == 1
+   the_mesh.sendSelfAdvertisement(16000, false);
+ #endif
++
++  // setup next time to send temperature
++  send_temperature_timer = the_mesh.futureMillis(30000);
+ }
+ 
+ void loop() {
+@@ -139,10 +159,40 @@ void loop() {
+     char reply[160];
+     the_mesh.handleCommand(0, command, reply);  // NOTE: there is no sender_timestamp via serial!
+     if (reply[0]) {
+-      Serial.print("  -> "); Serial.println(reply);
++      Serial.print("  -> ");
++      Serial.println(reply);
+     }
+ 
+-    command[0] = 0;  // reset command buffer
++    command[0] = 0; // reset command buffer
++  }
++
++  // Test Code to send periodically temperature to neighbours
++  if (send_temperature_timer && the_mesh.millisHasNowPassed(send_temperature_timer)) {
++
++    CayenneLPP telem(25);
++    sensors.querySensors(TELEM_PERM_ENVIRONMENT, telem);
++    uint8_t *buf = telem.getBuffer();
++
++    while (*buf != LPP_TEMPERATURE) {
++      buf++;
++    }
++    buf++;
++
++    int16_t temperature = (*buf << 8) | *(buf + 1);
++
++//    uint8_t raw_data[] = {*buf, *(buf+1)};
++//    uint8_t companion_path[] = {0xd9};
++//    uint8_t companion_path_len = 1;
++    uint8_t raw_data[10]={0,1,2,3,4,5,6,7,8,9};
++    // mesh::Packet* packet = the_mesh.createRawData(raw_data, 10);
++
++/// JMF
++    mesh::Packet *packet = the_mesh.createControlData(raw_data, 10);
++    Serial.println("Temperature sent");
++      the_mesh.sendFlood(packet); // ,0,1); // path hash size = 1 byte ; current path hash count = 0
++//    the_mesh.sendDirect(packet,companion_path,companion_path_len);
++
++    send_temperature_timer = the_mesh.futureMillis(30000); // next temperature send in 30 sec
+   }
+ 
+   the_mesh.loop();
+diff --git a/platformio.ini b/platformio.ini
+index e78124a4..163fd0c9 100644
+--- a/platformio.ini
++++ b/platformio.ini
+@@ -26,9 +26,9 @@ lib_deps =
+   melopero/Melopero RV3028 @ ^1.1.0
+   electroniccats/CayenneLPP @ 1.6.1
+ build_flags = -w -DNDEBUG -DRADIOLIB_STATIC_ONLY=1 -DRADIOLIB_GODMODE=1
+-  -D LORA_FREQ=869.618
+-  -D LORA_BW=62.5
+-  -D LORA_SF=8
++  -D LORA_FREQ=868.1
++  -D LORA_BW=125
++  -D LORA_SF=7
+   -D ENABLE_ADVERT_ON_BOOT=1
+   -D ENABLE_PRIVATE_KEY_IMPORT=1   ; NOTE: comment these out for more secure firmware
+   -D ENABLE_PRIVATE_KEY_EXPORT=1
+diff --git a/src/helpers/radiolib/CustomSX1262.h b/src/helpers/radiolib/CustomSX1262.h
+index b4ee6c97..d446418f 100644
+--- a/src/helpers/radiolib/CustomSX1262.h
++++ b/src/helpers/radiolib/CustomSX1262.h
+@@ -53,12 +53,14 @@ class CustomSX1262 : public SX1262 {
+       if (spi) spi->begin(P_LORA_SCLK, P_LORA_MISO, P_LORA_MOSI);
+     #endif
+   #endif
+-      int status = begin(LORA_FREQ, LORA_BW, LORA_SF, cr, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 16, tcxo, useRegulatorLDO);
++      // int status = begin(LORA_FREQ, LORA_BW, LORA_SF, cr, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 16, tcxo, useRegulatorLDO);
++      int status = begin(LORA_FREQ, LORA_BW, LORA_SF, cr, RADIOLIB_SX126X_SYNC_WORD_PUBLIC, LORA_TX_POWER, 8, tcxo);
+       // if radio init fails with -707/-706, try again with tcxo voltage set to 0.0f
+       if (status == RADIOLIB_ERR_SPI_CMD_FAILED || status == RADIOLIB_ERR_SPI_CMD_INVALID) {
+         MESH_DEBUG_PRINTLN("SX1262 init failed with error %d, retrying with TCXO at 0.0V", status);
+         tcxo = 0.0f;
+-        status = begin(LORA_FREQ, LORA_BW, LORA_SF, cr, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 16, tcxo, useRegulatorLDO);
++        // status = begin(LORA_FREQ, LORA_BW, LORA_SF, cr, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 16, tcxo, useRegulatorLDO);
++        status = begin(LORA_FREQ, LORA_BW, LORA_SF, cr, RADIOLIB_SX126X_SYNC_WORD_PUBLIC, LORA_TX_POWER, 8, tcxo);
+       }
+       if (status != RADIOLIB_ERR_NONE) {
+         Serial.print("ERROR: radio init failed: ");
+@@ -162,4 +164,4 @@ class CustomSX1262 : public SX1262 {
+       readRegister(RADIOLIB_SX126X_REG_RX_GAIN, &rxGain, 1);
+       return (rxGain == RADIOLIB_SX126X_RX_GAIN_BOOSTED);
+     }
+-};
+\ No newline at end of file
++};
+diff --git a/variants/wio-e5-mini/target.cpp b/variants/wio-e5-mini/target.cpp
+index 92775d55..b3a34499 100644
+--- a/variants/wio-e5-mini/target.cpp
++++ b/variants/wio-e5-mini/target.cpp
+@@ -33,7 +33,8 @@ bool radio_init() {
+ 
+   radio.setRfSwitchTable(rfswitch_pins, rfswitch_table);
+ 
+-  int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 16, 1.7, 0);
++  // int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 16, 1.7, 0);
++  int status = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PUBLIC, LORA_TX_POWER, 8, 1.7, 0);
+ 
+   if (status != RADIOLIB_ERR_NONE) {
+     Serial.print("ERROR: radio init failed: ");
+@@ -76,4 +77,4 @@ bool WIOE5SensorManager::begin() {
+   has_bme = bme.begin();
+ 
+   return has_bme;
+-}
+\ No newline at end of file
++}
